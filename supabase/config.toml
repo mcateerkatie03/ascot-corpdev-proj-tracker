@@ -1,0 +1,10 @@
+# The transcript function checks the caller's login itself (supabase.auth.getUser),
+# so the gateway's legacy JWT check is off. This is needed with the new
+# publishable/secret API keys and JWT signing keys.
+[functions.transcript]
+verify_jwt = false
+
+# The weekly digest is called by a Supabase Cron job, not a login. It checks the
+# x-digest-secret header against the DIGEST_SECRET secret itself.
+[functions.digest]
+verify_jwt = false

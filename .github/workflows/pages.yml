@@ -1,0 +1,47 @@
+name: Deploy site to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Write web/config.js from repository variables
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY || vars.SUPABASE_ANON_KEY }}
+          USERNAME_DOMAIN: ${{ vars.USERNAME_DOMAIN }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Add repository variables SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY (Settings > Secrets and variables > Actions > Variables)."
+            exit 1
+          fi
+          case "$SUPABASE_PUBLISHABLE_KEY" in sb_secret_*)
+            echo "::error::SUPABASE_PUBLISHABLE_KEY holds a secret key (sb_secret_...). Use the publishable key (sb_publishable_...) and delete this variable's value."
+            exit 1;;
+          esac
+          node -e 'const c={supabaseUrl:process.env.SUPABASE_URL.trim().replace(/\/+$/,"").replace(/\/(rest|auth)\/v1$/,""),supabaseAnonKey:process.env.SUPABASE_PUBLISHABLE_KEY,usernameDomain:process.env.USERNAME_DOMAIN||"corpdev-tracker.local"};require("fs").writeFileSync("web/config.js","window.TRACKER_CONFIG = "+JSON.stringify(c,null,2)+";\n")'
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,1291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Ascot Corp Dev Tracker</title>
+<style>
+/* Layout: Ascot template chrome (spectrum stripe, magenta action title, navy text, footer) over a tabbed app with a side drawer. */
+:root{
+  --bg:#FFFFFF; --surface:#FFFFFF; --tile:#EEEEF5; --alt:#F5F5FA; --grid:#D9DCE6;
+  --ink:#262166; --muted:#666666; --magenta:#EB008C; --blue:#00539E; --lblue:#0081C3;
+  --teal:#00857C; --purple:#944599; --head:#262166; --headInk:#FFFFFF;
+  --overlay:rgba(38,33,102,.28); --shadow:0 12px 40px rgba(38,33,102,.18);
+  --font:Arial,"Helvetica Neue",Helvetica,sans-serif;
+}
+:root,:root[data-theme]{color-scheme:light}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);margin:0}
+body{color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--blue)}
+:focus-visible{outline:2px solid var(--magenta);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+
+/* Template chrome */
+.stripe{display:flex;height:6px}
+.stripe i{flex:1}
+.stripe i:nth-child(1){background:#262166}.stripe i:nth-child(2){background:#944599}
+.stripe i:nth-child(3){background:#EB008C}.stripe i:nth-child(4){background:#0081C3}
+.stripe i:nth-child(5){background:#00539E}.stripe i:nth-child(6){background:#00857C}
+.wrap{max-width:1320px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{border-bottom:1px solid var(--grid);background:var(--surface)}
+.top .wrap{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px;padding-block:14px 0}
+.brand{flex:1 1 320px;min-width:0;padding-bottom:12px}
+.kicker{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);font-weight:bold}
+.brand h1{margin:2px 0 0;font-size:24px;color:var(--magenta);font-weight:normal;text-wrap:balance}
+.who{position:relative;display:flex;align-items:center;gap:10px;padding-bottom:12px;font-size:13px}
+.dot{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:bold;background:var(--blue);border:0;padding:0;cursor:pointer;font-family:inherit}
+.whomenu{position:absolute;right:0;top:calc(100% - 4px);z-index:30;min-width:220px;background:var(--surface);border:1px solid var(--grid);box-shadow:var(--shadow);display:flex;flex-direction:column;padding:6px 0}
+.whomenu .wm-n{padding:8px 14px 10px;border-bottom:1px solid var(--grid);margin-bottom:4px}
+.whomenu .wm-n b{display:block}.whomenu .wm-n span{font-size:12px;color:var(--muted)}
+.whomenu button{all:unset;cursor:pointer;padding:9px 14px;font-weight:bold;font-size:13px}
+.whomenu button:hover,.whomenu button:focus-visible{background:var(--tile)}
+nav.tabs{display:flex;gap:4px;flex-basis:100%;overflow-x:auto}
+nav.tabs a{padding:10px 16px;text-decoration:none;color:var(--ink);border-bottom:3px solid transparent;font-weight:bold;white-space:nowrap}
+nav.tabs a[aria-current="page"]{border-bottom-color:var(--magenta);color:var(--magenta)}
+nav.tabs a:hover{background:var(--alt)}
+nav.tabs .ntag{font-weight:normal;font-size:11px;color:var(--muted);margin-left:6px}
+main .wrap{padding-block:22px 28px;display:flex;flex-direction:column;gap:26px}
+footer.foot{border-top:1px solid var(--grid)}
+footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-block:10px;font-size:11px;color:var(--muted)}
+
+/* Type */
+.action-title{font-size:22px;color:var(--magenta);margin:0;text-wrap:balance}
+.sub{margin:4px 0 0;color:var(--ink)}
+.sec{display:flex;align-items:center;gap:12px;margin:0 0 12px;font-size:14px;font-weight:bold;color:var(--ink)}
+.sec::before,.sec::after{content:"";flex:1;height:1px;background:var(--ink);opacity:.6}
+.sec .n{font-weight:normal;color:var(--muted)}
+.source{font-size:11px;font-style:italic;color:var(--muted);margin:0}
+.banner{background:var(--tile);border-left:4px solid var(--magenta);padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.pagehead{display:flex;flex-wrap:wrap;gap:10px 24px;align-items:flex-start;justify-content:space-between}
+.pagehead>div:first-child{flex:1 1 420px;min-width:0}
+.headacts{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Tiles */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.tile{background:var(--tile);padding:16px 18px;min-width:0}
+.tile b{display:block;font-size:28px;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile span{display:block;font-size:12px;margin-top:6px}
+.tile small{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.c-navy{color:var(--ink)}.c-mag{color:var(--magenta)}.c-blue{color:var(--blue)}.c-teal{color:var(--teal)}.c-purple{color:var(--purple)}
+.cols{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:28px}
+.cols>*{min-width:0}
+@media (max-width:900px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.cols{grid-template-columns:1fr}}
+
+/* Lists */
+.mlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.mlist li{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;padding:9px 0;border-bottom:1px solid var(--grid)}
+.mlist .d{font-size:12px;font-weight:bold;font-variant-numeric:tabular-nums}
+.mlist p{margin:0}
+.mlist .meta{font-size:12px;color:var(--muted)}
+.mlist.hist li{grid-template-columns:118px minmax(0,1fr)}
+.mlist.hist .d{font-weight:normal;color:var(--muted)}
+.mlist.hist p{font-size:13px}
+.mlist li.click{cursor:pointer}
+.mlist li.click:hover p b{color:var(--magenta)}
+
+/* To-do rows */
+.todos{list-style:none;margin:0;padding:0}
+.todo{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px 10px;align-items:start;padding:9px 0;border-bottom:1px solid var(--grid)}
+.todo input[type=checkbox]{width:18px;height:18px;margin:2px 0 0;accent-color:var(--teal);cursor:pointer}
+.todo .tx{cursor:pointer;min-width:0;overflow-wrap:anywhere}
+.todo .tx:hover b{color:var(--magenta)}
+.todo .meta{font-size:12px;color:var(--muted)}
+.todo .due{font-size:12px;font-weight:bold;white-space:nowrap;text-align:right}
+.todo.done .tx b{text-decoration:line-through;color:var(--muted);font-weight:normal}
+.over{color:var(--magenta);font-weight:bold}
+.owner{display:inline-block;font-size:11px;font-weight:bold;background:var(--tile);padding:1px 6px;margin-right:6px;white-space:nowrap}
+.carry{font-size:11px;color:var(--purple);white-space:nowrap}
+
+/* Tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--grid)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{background:var(--head);color:var(--headInk);font-weight:bold;text-align:left;padding:8px 10px;white-space:nowrap;font-size:12px}
+td{padding:8px 10px;border-top:1px solid var(--grid);vertical-align:top}
+tbody tr:nth-child(even) td{background:var(--alt)}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--tile)}
+td .t1{font-weight:bold}
+td .t2,.t2{font-size:12px;color:var(--muted)}
+td.desc{min-width:200px;max-width:340px}
+td.upd{min-width:240px;max-width:520px}
+.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.prose{white-space:pre-wrap;margin:0;overflow-wrap:anywhere}
+tr.cathead td{background:var(--tile)!important;border-top:2px solid var(--ink);font-weight:bold;font-size:13px;cursor:default}
+.tag{display:inline-block;font-size:10px;font-weight:bold;letter-spacing:.05em;text-transform:uppercase;padding:0 5px;margin-left:6px;vertical-align:1px;white-space:nowrap}
+.tag.new{background:var(--magenta);color:#fff}
+.tag.upd{background:var(--tile);color:var(--blue)}
+.tag.quiet{color:var(--muted);border:1px dashed var(--muted)}
+.tag.chk{color:var(--purple);border:1px solid var(--purple)}
+
+/* Pills */
+.pill{display:inline-block;padding:2px 8px;font-size:11px;font-weight:bold;border:1px solid currentColor;white-space:nowrap}
+.s-Active{color:var(--blue)}
+.s-Pending{color:var(--purple);border-style:dashed}
+.s-Completed{color:#fff;background:var(--teal);border-color:var(--teal)}
+.s-Dropped{color:var(--muted);text-decoration:line-through}
+.stage{display:inline-block;margin-top:4px;font-size:11px;color:var(--muted)}
+
+/* Filters */
+.fchips{display:flex;flex-wrap:wrap;gap:6px}
+.fchip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--grid);background:var(--surface);color:var(--ink);cursor:pointer;font-size:12px;font-weight:bold;white-space:nowrap}
+.fchip b{font-weight:normal;color:var(--muted);font-variant-numeric:tabular-nums}
+.fchip:hover{border-color:var(--ink)}
+.fchip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.fchip[aria-pressed="true"] b{color:#fff}
+.fchip.late{color:var(--magenta);border-color:var(--magenta)}
+.fchip.late[aria-pressed="true"]{background:var(--magenta);color:#fff}
+.frow{display:flex;flex-direction:column;gap:8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mob{display:none}
+.links{display:flex;flex-wrap:wrap;gap:6px}
+.deck{display:inline-flex;align-items:center;gap:6px;padding:3px 8px 3px 4px;border:1px solid var(--grid);text-decoration:none;color:var(--ink);font-size:12px;background:var(--surface);max-width:100%}
+.deck:hover{border-color:var(--magenta)}
+.deck .ic{font-size:9px;font-weight:bold;color:#fff;background:var(--muted);padding:2px 3px;letter-spacing:.03em}
+.deck span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Controls */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.toolbar .grow{flex:1 1 220px;min-width:0}
+input[type=text],input[type=search],input[type=date],input[type=url],input[type=password],select,textarea{
+  width:100%;padding:7px 9px;border:1px solid var(--grid);background:var(--surface);border-radius:0}
+textarea{resize:vertical;min-height:64px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--ink);background:var(--surface);color:var(--ink);cursor:pointer;font-weight:bold;font-size:13px;white-space:nowrap;text-decoration:none}
+.btn:hover{background:var(--tile)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.primary:hover{opacity:.9}
+.btn.accent{background:var(--magenta);border-color:var(--magenta);color:#fff}
+.btn.danger{color:var(--magenta);border-color:var(--magenta)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{padding:4px 9px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.addtodo{display:grid;grid-template-columns:minmax(0,1fr) 90px 150px auto;gap:6px;align-items:start}
+@media (max-width:700px){.addtodo{grid-template-columns:1fr 1fr}.addtodo input:first-child{grid-column:1/-1}}
+
+/* Drawer */
+.scrim{position:fixed;inset:0;background:var(--overlay);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(640px,100%);background:var(--surface);z-index:41;display:flex;flex-direction:column;box-shadow:var(--shadow);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.drawer.wide{width:min(980px,100%)}
+.drawer.still{animation:none!important}
+.drawer-h{display:flex;align-items:flex-start;gap:12px;padding:16px 20px;border-bottom:1px solid var(--grid)}
+.drawer-h h2{margin:0;font-size:20px;color:var(--magenta);font-weight:normal;flex:1;min-width:0}
+.drawer-b{flex:1;overflow:auto;padding:18px 20px;display:flex;flex-direction:column;gap:20px}
+.drawer-f{display:flex;flex-wrap:wrap;gap:8px;padding:12px 20px;border-top:1px solid var(--grid);align-items:center}
+.drawer-f .sp{flex:1}
+.fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+.fgrid .full{grid-column:1/-1}
+@media (max-width:560px){.fgrid{grid-template-columns:1fr}}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:bold;min-width:0}
+label.f em{font-weight:normal;font-style:normal;color:var(--muted)}
+label.chk{display:flex;gap:8px;align-items:flex-start;font-size:13px}
+label.chk input{margin-top:3px}
+.linkrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) auto;gap:6px;margin-bottom:6px}
+@media (max-width:560px){.linkrow{grid-template-columns:1fr}}
+.kv{display:grid;grid-template-columns:130px minmax(0,1fr);gap:6px 14px;font-size:13px}
+.kv dt{font-weight:bold}.kv dd{margin:0}
+.empty{border:1px dashed var(--grid);padding:28px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.empty p{margin:0;max-width:60ch}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;z-index:60;font-size:13px;max-width:calc(100% - 32px)}
+.lastsaved{margin-top:4px;font-size:12px;color:var(--muted)}
+#drAlert:empty{display:none}
+.conflict{background:var(--tile);border-left:4px solid var(--magenta);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.conflict h3{margin:0;font-size:15px;color:var(--magenta)}
+.conflict p{margin:0}
+.conflict .cf{display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid var(--grid)}
+.conflict .acts{display:flex;gap:8px;flex-wrap:wrap}
+.conflict .btn.on{background:var(--ink);border-color:var(--ink);color:#fff}
+
+/* Transcript review */
+.rv{border:1px solid var(--grid);border-left:4px solid var(--blue);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.rv.off{opacity:.55;border-left-color:var(--grid)}
+.rv.n{border-left-color:var(--magenta)}.rv.a{border-left-color:var(--teal)}
+.rv .rh{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.rv .rh label.chk{font-weight:bold;font-size:14px;flex:1;min-width:200px}
+.rv .why{font-size:12px;color:var(--muted);font-style:italic}
+.rv .old{font-size:12px;color:var(--muted);white-space:pre-wrap;border-left:2px solid var(--grid);padding-left:8px}
+.rvgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rvgrid .full{grid-column:1/-1}
+@media (max-width:700px){.rvgrid{grid-template-columns:1fr}}
+.rvtodo{display:grid;grid-template-columns:24px minmax(0,2fr) 80px minmax(0,1.3fr) 140px;gap:6px;align-items:start;padding:6px 0;border-bottom:1px solid var(--grid)}
+.rvtodo .q{grid-column:2/-1;font-size:11px;color:var(--muted);font-style:italic;margin-top:-2px}
+@media (max-width:700px){.rvtodo{grid-template-columns:24px 1fr 1fr}.rvtodo .q{grid-column:1/-1}}
+.busy{display:flex;gap:12px;align-items:center;background:var(--tile);padding:14px}
+.spin{width:18px;height:18px;border:3px solid var(--grid);border-top-color:var(--magenta);border-radius:50%;flex:none}
+@media (prefers-reduced-motion:no-preference){.spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}}
+
+/* Login */
+.login{max-width:440px;width:100%;margin:28px auto;display:flex;flex-direction:column;gap:14px;background:var(--tile);padding:28px}
+.login h2{margin:0;color:var(--magenta);font-weight:normal;font-size:22px}
+.login p{margin:0}
+.err{color:var(--magenta);font-size:13px;margin:0}
+@media (prefers-reduced-motion:no-preference){.drawer{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(24px);opacity:.6}}}
+@media print{
+  @page{size:A4 landscape;margin:12mm}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{font-size:12px}
+  header.top .who,nav.tabs,.headacts,.toolbar,.fchips,#drawerRoot,#toastRoot,.todo input{display:none!important}
+  .wrap{max-width:none;padding-left:0;padding-right:0}
+  main .wrap{gap:16px;padding-block:10px}
+  .tbl-wrap{overflow:visible;border:0}
+  tr,li,.tile{break-inside:avoid}
+  thead{display:table-header-group}
+  .clamp{display:block;-webkit-line-clamp:unset;overflow:visible}
+}
+/* Phone: compact header, tabs that fit, tables as cards */
+@media (max-width:700px){
+  nav.tabs .ntag{display:none}
+  .top .wrap{align-items:center;gap:6px 12px;padding-block:10px 0}
+  .brand{flex:1 1 0;padding-bottom:4px}
+  .brand h1{font-size:19px}
+  .who{padding-bottom:4px;gap:8px}
+  #whoName{display:none}
+  .dot{width:34px;height:34px;font-size:13px}
+  nav.tabs a{padding:10px 8px}
+  main .wrap{padding-block:16px 22px;gap:18px}
+  .action-title{font-size:19px}
+  .toolbar .btn,.headacts .btn{flex:1 1 auto;justify-content:center}
+  .tbl-wrap.cardwrap{border:0;overflow:visible}
+  table.cards,table.cards tbody{display:block;width:100%}
+  table.cards thead{display:none}
+  table.cards tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding:12px;border:1px solid var(--grid);margin-bottom:10px;background:var(--surface)}
+  table.cards td{display:block;padding:0;border:0;min-width:0;max-width:none;text-align:left;white-space:normal}
+  table.cards tbody tr:nth-child(even) td,table.cards tr.click:hover td{background:transparent}
+  table.cards tr.cathead{display:block;border:0;border-top:2px solid var(--ink);padding:10px 0 4px;margin:14px 0 8px;background:transparent}
+  table.cards tr.cathead td{background:transparent!important;border:0}
+  table.cards td.c-full{grid-column:1/-1}
+  table.cards td.c-side{text-align:right}
+  table.cards td.c-hide{display:none!important}
+  table.cards td[data-label]::before{content:attr(data-label);display:block;font-size:11px;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+  table.cards .mob{display:block;margin-top:2px}
+  .todo{grid-template-columns:28px minmax(0,1fr)}
+  .todo .due{grid-column:2;text-align:left}
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+</head>
+<body>
+<div class="stripe" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <div class="kicker">Corporate development</div>
+      <h1>Weekly project tracker</h1>
+    </div>
+    <div class="who">
+      <span id="whoName"></span><button type="button" class="dot" id="whoDot" data-act="who-menu" aria-haspopup="menu" aria-expanded="false" aria-controls="whoMenu" hidden></button>
+      <div class="whomenu" id="whoMenu" role="menu" hidden><div class="wm-n" id="whoMenuName"></div>
+        <button role="menuitem" data-act="settings">Settings</button><button role="menuitem" data-act="import-wb">Import workbook (.xlsx)</button><button role="menuitem" data-act="change-pw">Change password</button><button role="menuitem" data-act="signout">Sign out</button></div>
+    </div>
+    <nav class="tabs" aria-label="Views" id="tabs" hidden>
+      <a href="#week" data-view="week">This week</a>
+      <a href="#projects" data-view="projects">Projects</a>
+      <a href="#todos" data-view="todos">To-dos<span class="ntag" id="tagTodos"></span></a>
+      <a href="#archive" data-view="archive">Archive</a>
+      <a href="#meetings" data-view="meetings">Meetings</a>
+    </nav>
+  </div>
+</header>
+
+<main><div class="wrap" id="view"></div></main>
+<footer class="foot"><div class="wrap"><span>2026 Ascot Group</span><span>Confidential: corporate development use only</span></div></footer>
+
+<div id="drawerRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+"use strict";
+/* ---------- constants ---------- */
+const CATEGORIES = ["Portfolio Growth Initiatives","Strategy Refinement / Organic Growth Initiatives","External Growth Initiatives","Quarterly Board Updates","Other Projects"];
+const CAT_SHORT = {"Portfolio Growth Initiatives":"Portfolio growth","Strategy Refinement / Organic Growth Initiatives":"Strategy / organic","External Growth Initiatives":"External growth","Quarterly Board Updates":"Board updates","Other Projects":"Other"};
+const NO_CAT = "Not categorised";
+const STATUSES = ["Active","Pending","Completed","Dropped"];
+const OPEN = ["Active","Pending"];
+const STATUS_HELP = {Active:"Ongoing",Pending:"No update, or waiting on someone else",Completed:"Finished or sent out; comes off the list",Dropped:"Started but taken off the list without finishing"};
+const STAGES = ["Screening","NDA signed","LOI","Diligence","Closed","On hold","Dead"];   // deal stage: External Growth projects only
+const EXTERNAL = "External Growth Initiatives", BOARD = "Quarterly Board Updates";
+const PROJECT_FIELDS = ["name","category","quarter","status","stage","description","stakeholders","corpDev","update","links"];
+const TODO_FIELDS = ["text","owner","projectId","due","done","notes"];
+const FIELD_LABELS = {name:"Project",category:"Category",quarter:"Quarter",status:"Status",stage:"Deal stage",description:"Description",stakeholders:"Stakeholders",corpDev:"Corp Dev",update:"Weekly update",links:"Links",
+  text:"To-do",owner:"Owner",projectId:"Project",due:"Due",done:"Done",notes:"Notes",closedAt:"Closed",updateDate:"Update date"};
+const LONG_FIELDS = ["description","update","notes"];
+const QUIET_DAYS = 21;
+const DAY_MS = 86400000;
+const XLSX_SRC = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+const JSZIP_SRC = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
+
+/* ---------- state ---------- */
+const CFG = Object.assign({}, window.TRACKER_CONFIG || {});
+if(CFG.supabaseUrl) CFG.supabaseUrl = String(CFG.supabaseUrl).trim().replace(/\/+$/,"").replace(/\/(rest|auth)\/v1$/,"");
+const TABLES = ["projects","todos","meetings"];
+const S = {
+  view:"week", sb:null, db:null, meId:null, session:null, authChecked:false, started:false, channel:null, loginErr:"", loginBusy:false,
+  projects:[], todos:[], meetings:[], loaded:{projects:false,todos:false,meetings:false}, stale:false, configMissing:false,
+  profiles:{}, settings:{}, hist:{}, changes:null,
+  q:"", pf:"open", pcat:"all", ppl:"all", tf:"open", tpl:"all", aq:"", drawer:null
+};
+
+/* ---------- helpers ---------- */
+function iso(d){ const z=new Date(d.getTime()-d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); }
+const TODAY = () => iso(new Date());
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function fmtDate(s){ if(!s) return ""; const d=new Date(s+"T00:00:00"); if(isNaN(d)) return esc(s);
+  return d.toLocaleDateString("en-GB",{day:"numeric",month:"short", ...(d.getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{})}); }
+function fmtWhen(ms){ if(!ms) return ""; const d=new Date(ms); return d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})+" "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}); }
+function fmtAgo(ms){ if(!ms) return ""; const m=Math.round((Date.now()-ms)/60000); if(m<1) return "just now"; if(m<60) return `${m} min ago`; const h=Math.round(m/60); if(h<24) return `${h} h ago`; return fmtWhen(ms); }
+function daysUntil(s){ if(!s) return null; return Math.round((new Date(s+"T00:00:00") - new Date(TODAY()+"T00:00:00"))/DAY_MS); }
+function addDays(s,n){ const d=new Date(s+"T00:00:00"); d.setDate(d.getDate()+n); return iso(d); }
+function safeUrl(u){ try{ const x=new URL(String(u).trim()); return (x.protocol==="https:"||x.protocol==="http:") ? x.href : null; }catch{ return null; } }
+function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+function toast(msg){ const r=document.getElementById("toastRoot"); r.innerHTML=`<div class="toast" role="status">${esc(msg)}</div>`; clearTimeout(toast.t); toast.t=setTimeout(()=>{ r.innerHTML=""; },3600); }
+function nameOf(id, stored){ if(stored) return stored; if(!id) return "Someone"; const p=S.profiles[id]; return (p && p.name) || "Teammate"; }
+const val = id => (document.getElementById(id)?.value ?? "").trim();
+const isOpen = p => OPEN.includes(p.status||"Active");
+const catOf = p => CATEGORIES.includes(p.category) ? p.category : NO_CAT;
+const projById = id => S.projects.find(p=>p.id===id);
+const initialsList = s => String(s||"").toUpperCase().split(/[\/,&;]|\s+and\s+|\s+/).map(x=>x.trim()).filter(Boolean);
+function myInitials(){ return ((S.session && S.session.initials) || "").toUpperCase(); }
+function statusPill(st){ st=STATUSES.includes(st)?st:"Active"; return `<span class="pill s-${st}" title="${esc(STATUS_HELP[st])}">${st}</span>`; }
+function loadScript(src, what){ return new Promise((res,rej)=>{ if(loadScript.done&&loadScript.done[src]) return res(); const el=document.createElement("script"); el.src=src; el.onload=()=>{ (loadScript.done=loadScript.done||{})[src]=1; res(); }; el.onerror=()=>rej(new Error(`the ${what} library didn't load. Check your connection and try again`)); document.head.appendChild(el); }); }
+function links(list){ const ok=(list||[]).map(l=>({...l,u:safeUrl(l.url)})).filter(l=>l.u); if(!ok.length) return `<span class="t2">None linked</span>`;
+  return `<div class="links">${ok.map(l=>`<a class="deck" href="${esc(l.u)}" target="_blank" rel="noopener noreferrer" title="${esc(l.u)}"><span class="ic">LINK</span><span>${esc(l.label||"Open file")}</span></a>`).join("")}</div>`; }
+function latestMeeting(){ return [...S.meetings].sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0] || null; }
+function prevMeeting(){ return [...S.meetings].sort((a,b)=>String(b.date).localeCompare(String(a.date)))[1] || null; }
+function teamInitials(){ const s=new Set(); Object.values(S.profiles).forEach(p=>p.initials&&s.add(p.initials.toUpperCase())); S.projects.forEach(p=>initialsList(p.corpDev).forEach(i=>/^[A-Z]{2,3}$/.test(i)&&s.add(i))); return [...s].sort(); }
+function quietDays(p){ const d=p.updateDate || (p.createdAt?iso(new Date(p.createdAt)):""); if(!d) return null; return -daysUntil(d); }
+function projTags(p){
+  const lm=latestMeeting(); let t="";
+  if(lm && p.createdInMeeting===lm.id) t+=`<span class="tag new">New</span>`;
+  else if(lm && p.updateDate===lm.date) t+=`<span class="tag upd">Updated</span>`;
+  const q=quietDays(p); if(isOpen(p) && q!=null && q>=QUIET_DAYS) t+=`<span class="tag quiet" title="No update since ${esc(fmtDate(p.updateDate||""))}">Quiet ${Math.floor(q/7)} wk</span>`;
+  if(p.categoryCheck) t+=`<span class="tag chk" title="Claude filed this category automatically. Open the project to confirm it.">Check category</span>`;
+  return t;
+}
+function todoOverdue(t){ const n=daysUntil(t.due); return !t.done && n!=null && n<0; }
+function sortTodos(list){ return list.sort((a,b)=>(a.done-b.done) || String(a.due||"9999").localeCompare(String(b.due||"9999")) || String(a.owner||"").localeCompare(String(b.owner||"")) || (a.createdAt||0)-(b.createdAt||0)); }
+
+/* ---------- routing ---------- */
+const VIEWS = ["week","projects","todos","archive","meetings"];
+function parseHash(){ let h=(location.hash||"").replace(/^#/,""); try{ h=decodeURIComponent(h); }catch{} const m=h.match(/^(project|todo|meeting)\/(.+)$/); return m?{kind:m[1],id:m[2]}:{view:h}; }
+function route(){
+  const r=parseHash();
+  if(r.kind){ if(!S.routed) S.view = r.kind==="todo"?"todos":r.kind==="meeting"?"meetings":"projects"; S.routed=true; render(); openRoute(r); return; }
+  S.pushed=false;
+  if(S.drawer && S.drawer.id && ["project","todo","meeting"].includes(S.drawer.kind)) S.drawer=null;
+  S.view = VIEWS.includes(r.view) ? r.view : "week"; S.routed=true; render();
+}
+function openRoute(r){
+  const tbl = r.kind+"s";
+  if(!S.session || !S.loaded[tbl]){ S.pendingRoute=r; return; }
+  S.pendingRoute=null;
+  const dr=S.drawer; if(dr && dr.id===r.id && dr.kind===r.kind) return;
+  const rec=S[tbl].find(x=>x.id===r.id);
+  if(!rec){ toast(`That ${r.kind==="todo"?"to-do":r.kind} isn't in the tracker. It may have been deleted.`); history.replaceState(null,"","#"+S.view); S.pushed=false; return; }
+  if(r.kind==="meeting"){ S.drawer={kind:"meeting",id:r.id}; renderDrawer(); }
+  else openEditor(r.kind, r.id);
+}
+function goRecord(kind,id){ const h="#"+kind+"/"+encodeURIComponent(id); if(location.hash===h) openRoute({kind,id}); else { S.pushed=true; location.hash=h; } }
+window.addEventListener("hashchange", route);
+
+/* ---------- render ---------- */
+function render(){
+  const v=document.getElementById("view");
+  document.getElementById("tabs").hidden = !S.session;
+  const wn=document.getElementById("whoName"); wn.textContent = S.session ? S.session.name : "";
+  document.getElementById("whoMenuName").innerHTML = S.session ? `<b>${esc(S.session.name)}</b><span>${esc(S.session.username||"")}${S.session.initials?` · ${esc(S.session.initials)}`:""}</span>` : "";
+  if(!S.session){ setMenu(false); const keep=[val("li_user")]; v.innerHTML=loginHTML(); const u=document.getElementById("li_user"); if(u&&keep[0]) u.value=keep[0]; renderDrawer(); return; }
+  document.querySelectorAll("nav.tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.view===S.view ? "page" : "false"));
+  const mine=S.todos.filter(t=>!t.done && myInitials() && initialsList(t.owner).includes(myInitials())).length;
+  document.getElementById("tagTodos").textContent = mine ? `${mine} yours` : "";
+  const html = TABLES.some(t=>!S.loaded[t]) ? "" : S.view==="projects" ? renderProjects() : S.view==="todos" ? renderTodos() : S.view==="archive" ? renderArchive() : S.view==="meetings" ? renderMeetings() : renderWeek();
+  const ae=document.activeElement, aid=ae&&ae.id, pos=ae&&ae.selectionStart;
+  v.innerHTML = statusBanner() + html;
+  if(aid){ const e=document.getElementById(aid); if(e && e!==document.activeElement && /^(q|aq|tq)$/.test(aid)){ e.focus(); try{ e.setSelectionRange(pos,pos); }catch{} } }
+  renderDrawer();
+}
+function statusBanner(){
+  if(TABLES.some(t=>!S.loaded[t])) return S.stale ? `<div class="banner"><span>The shared tracker can't be reached yet. Check your connection; the page keeps trying.</span></div>` : `<div class="banner"><span>Loading the shared tracker…</span></div>`;
+  return "";
+}
+function emptyStart(){
+  return `<div class="empty"><p><b>No projects yet.</b> Import your current project workbook (.xlsx) to bring in the Current tab, Old Projects and the dated weekly tabs, or add projects one by one.</p>
+    <div class="inline"><button class="btn primary" data-act="import-wb">Import workbook</button><button class="btn" data-act="new-project">New project</button></div></div>`;
+}
+
+/* This week: the dashboard */
+function renderWeek(){
+  const lm=latestMeeting(), open=S.projects.filter(isOpen);
+  const act=open.filter(p=>p.status!=="Pending"), pend=open.filter(p=>p.status==="Pending");
+  const openTodos=S.todos.filter(t=>!t.done), overdue=openTodos.filter(todoOverdue);
+  const updated = lm ? open.filter(p=>p.updateDate===lm.date || p.createdInMeeting===lm.id).length : 0;
+  const closedLast = lm ? S.projects.filter(p=>!isOpen(p) && p.closedAt===lm.date) : [];
+  const weekEnd = addDays(TODAY(), 7);
+  const due = sortTodos(openTodos.filter(t=>!t.due || t.due<=weekEnd));
+  const later = openTodos.length - due.length;
+  return `
+  <section class="pagehead"><div><h2 class="action-title">${lm?`Week of ${esc(fmtDate(lm.date))}`:"This week"}</h2>
+    <p class="sub">${lm?`From the meeting on ${esc(fmtDate(lm.date))}${lm.summary?`: ${esc(lm.summary)}`:"."}`:"Import a meeting transcript to fill in this week's updates and to-dos."}</p></div>
+    <div class="headacts"><button class="btn accent" data-act="import-tr">Import transcript</button><button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn" data-act="print">Print</button></div></section>
+  <section class="tiles" aria-label="Headline numbers">
+    <div class="tile"><b class="c-blue">${act.length}</b><span>Active projects</span><small>${open.length} on the list</small></div>
+    <div class="tile"><b class="c-purple">${pend.length}</b><span>Pending</span><small>No update, or waiting on others</small></div>
+    <div class="tile"><b class="c-mag">${openTodos.length}</b><span>Open to-dos</span><small>${overdue.length} overdue</small></div>
+    <div class="tile"><b class="c-teal">${updated}</b><span>Updated at the last meeting</span><small>${closedLast.length?`${closedLast.length} completed or dropped`:lm?"None closed":"No meeting yet"}</small></div>
+  </section>
+  <section class="cols">
+    <div><h3 class="sec">To-dos for the week <span class="n">${due.length}</span></h3>${todoListHTML(due, {showProject:true})}
+      ${later?`<p class="t2" style="margin-top:6px"><a href="#todos">${later} more due later</a></p>`:""}</div>
+    <div><h3 class="sec">What changed</h3>${changesHTML()}</div>
+  </section>
+  ${S.projects.length ? projectTableHTML(open, {grouped:true}) : emptyStart()}
+  <p class="source">Source: Corp Dev weekly meetings${lm?`; last meeting ${esc(fmtDate(lm.date))}`:""}. Statuses: Active (ongoing), Pending (no update, or waiting on someone else).</p>`;
+}
+
+/* Project table, grouped by category, with the description on every row */
+function projectTableHTML(list, {grouped, archive}={}){
+  if(!list.length) return `<div class="empty"><p>No projects match.</p></div>`;
+  const cats=[...CATEGORIES, NO_CAT];
+  const sorted=[...list].sort((a,b)=>cats.indexOf(catOf(a))-cats.indexOf(catOf(b)) || String(a.quarter||"").localeCompare(String(b.quarter||"")) || (a.order??1e9)-(b.order??1e9) || String(a.name).localeCompare(String(b.name)));
+  const row = p => `<tr class="click" data-act="open-project" data-id="${esc(p.id)}" tabindex="0">
+    <td><div class="t1">${esc(p.name)}${archive?"":projTags(p)}</div>${p.quarter?`<div class="t2">${esc(p.quarter)}</div>`:""}${p.stage&&catOf(p)===EXTERNAL?`<span class="stage">Deal stage: ${esc(p.stage)}</span>`:""}
+      ${p.description?`<div class="t2 mob">${esc(p.description)}</div>`:""}</td>
+    <td class="c-side">${statusPill(p.status)}${archive&&p.closedAt?`<div class="t2">${esc(fmtDate(p.closedAt))}</div>`:""}</td>
+    <td class="desc c-hide"><div class="clamp prose">${esc(p.description||"")||'<span class="t2">No description</span>'}</div></td>
+    <td class="upd c-full" data-label="${archive?"Last update":"Update"}">${p.update?`<div class="prose clamp">${esc(p.update)}</div>`:'<span class="t2">No update yet</span>'}${p.updateDate&&!archive?`<div class="t2">${esc(fmtDate(p.updateDate))}</div>`:""}</td>
+    <td class="c-full" data-label="Corp Dev" style="white-space:nowrap">${esc(p.corpDev||"")}</td>
+    <td class="c-hide">${esc(p.stakeholders||"")}</td></tr>`;
+  let body="";
+  if(grouped){ for(const c of cats){ const g=sorted.filter(p=>catOf(p)===c); if(!g.length && (c===NO_CAT || archive)) continue;
+      body+=`<tr class="cathead"><td colspan="6">${esc(c)} <span class="t2">(${g.length})</span></td></tr>`+(g.length?g.map(row).join(""):`<tr><td colspan="6" class="t2">None at the moment.</td></tr>`); } }
+  else body=sorted.map(row).join("");
+  return `<section><div class="tbl-wrap cardwrap"><table class="cards"><thead><tr><th>Project</th><th>Status</th><th>Description</th><th>${archive?"Last update":"This week's update"}</th><th>Corp Dev</th><th>Stakeholders</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
+}
+
+/* Projects: the editable list with filters */
+function projectFilterChips(base){
+  const st=[["open","Open",isOpen],["Active","Active",p=>p.status!=="Pending"&&isOpen(p)],["Pending","Pending",p=>p.status==="Pending"],["quiet",`Quiet ${QUIET_DAYS/7}+ weeks`,p=>isOpen(p)&&(quietDays(p)??0)>=QUIET_DAYS]];
+  const chip=(grp,v,label,n,cls)=>`<button type="button" class="fchip${cls||""}" data-act="${grp}" data-v="${esc(v)}" aria-pressed="${S[grp]===v}">${esc(label)}<b>${n}</b></button>`;
+  const openList=base.filter(isOpen);
+  const cats=[...CATEGORIES,NO_CAT].filter(c=>c!==NO_CAT||openList.some(p=>catOf(p)===NO_CAT));
+  const people=teamInitials();
+  return `<div class="frow">
+    <div class="fchips" role="group" aria-label="Status">${st.map(([v,l,f])=>chip("pf",v,l,base.filter(f).length,v==="quiet"?" late":"")).join("")}</div>
+    <div class="fchips" role="group" aria-label="Category">${chip("pcat","all","All categories",openList.length)}${cats.map(c=>chip("pcat",c,CAT_SHORT[c]||c,openList.filter(p=>catOf(p)===c).length)).join("")}</div>
+    ${people.length?`<div class="fchips" role="group" aria-label="Corp Dev">${chip("ppl","all","Everyone",openList.length)}${people.map(i=>chip("ppl",i,i+(i===myInitials()?" (you)":""),openList.filter(p=>initialsList(p.corpDev).includes(i)).length)).join("")}</div>`:""}
+  </div>`;
+}
+function searched(list,q){ q=q.trim().toLowerCase(); if(!q) return list; return list.filter(p=>[p.name,p.description,p.update,p.stakeholders,p.corpDev,p.category,p.quarter].join(" ").toLowerCase().includes(q)); }
+function renderProjects(){
+  const base=searched(S.projects,S.q);
+  const f={open:isOpen,Active:p=>p.status!=="Pending"&&isOpen(p),Pending:p=>p.status==="Pending",quiet:p=>isOpen(p)&&(quietDays(p)??0)>=QUIET_DAYS}[S.pf]||isOpen;
+  const rows=base.filter(f).filter(p=>S.pcat==="all"||catOf(p)===S.pcat).filter(p=>S.ppl==="all"||initialsList(p.corpDev).includes(S.ppl));
+  return `
+  <section class="pagehead"><div><h2 class="action-title">Projects</h2><p class="sub">Everything on the list, grouped by category. Open a project to edit it; changes save to the shared tracker straight away.</p></div></section>
+  <section class="toolbar"><div class="grow"><input type="search" id="q" placeholder="Search projects, descriptions and updates" aria-label="Search projects" value="${esc(S.q)}"></div>
+    <button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn primary" data-act="new-project">New project</button></section>
+  ${S.projects.length?projectFilterChips(base)+projectTableHTML(rows,{grouped:true}):emptyStart()}
+  <p class="source">${rows.length} project${rows.length===1?"":"s"} shown. Completed and dropped projects are in the Archive.</p>`;
+}
+
+/* To-dos */
+function todoListHTML(list, {showProject, showMeeting}={}){
+  if(!list.length) return `<p class="t2">Nothing here.</p>`;
+  const lm=latestMeeting();
+  return `<ul class="todos">${list.map(t=>{ const p=t.projectId&&projById(t.projectId); const od=todoOverdue(t); const n=daysUntil(t.due);
+    const carried = !t.done && lm && t.meetingDate && t.meetingDate<lm.date;
+    return `<li class="todo${t.done?" done":""}" data-id="${esc(t.id)}"><input type="checkbox" data-act="todo-done" data-id="${esc(t.id)}" ${t.done?"checked":""} aria-label="Done: ${esc(t.text)}">
+      <div class="tx" data-act="open-todo" data-id="${esc(t.id)}" tabindex="0"><b>${t.owner?`<span class="owner">${esc(t.owner)}</span>`:""}${esc(t.text)}</b>
+        <div class="meta">${showProject&&p?esc(p.name):showProject&&t.projectId?"A removed project":""}${carried?`${showProject&&t.projectId?" · ":""}<span class="carry">Carried from ${esc(fmtDate(t.meetingDate))}</span>`:""}${showMeeting&&t.meetingDate&&!carried?` · from ${esc(fmtDate(t.meetingDate))}`:""}${t.done&&t.doneAt?` · done ${esc(fmtDate(t.doneAt))}`:""}</div></div>
+      <div class="due${od?" over":""}">${t.due?(od?"Overdue: ":n===0?"Today: ":"")+esc(fmtDate(t.due)):'<span class="t2">No date</span>'}</div></li>`; }).join("")}</ul>`;
+}
+function renderTodos(){
+  const people=[...new Set([...teamInitials(), ...S.todos.map(t=>String(t.owner||"").toUpperCase()).filter(Boolean)])].sort();
+  const me=myInitials();
+  const F={open:t=>!t.done, mine:t=>!t.done&&!!me&&initialsList(t.owner).includes(me), overdue:todoOverdue, week:t=>!t.done&&(!t.due||t.due<=addDays(TODAY(),7)), done:t=>t.done, all:()=>true};
+  const byPerson=t=>S.tpl==="all"||initialsList(t.owner).includes(S.tpl)||String(t.owner||"").toUpperCase()===S.tpl;
+  const q=(S.tq||"").trim().toLowerCase(); const base=S.todos.filter(t=>!q||[t.text,t.owner,t.notes,(projById(t.projectId)||{}).name].join(" ").toLowerCase().includes(q));
+  const rows=sortTodos(base.filter(F[S.tf]||F.open).filter(byPerson));
+  const chip=(grp,v,label,n,cls)=>`<button type="button" class="fchip${cls||""}" data-act="${grp}" data-v="${esc(v)}" aria-pressed="${S[grp]===v}">${esc(label)}<b>${n}</b></button>`;
+  return `
+  <section class="pagehead"><div><h2 class="action-title">To-dos</h2><p class="sub">Action items from the weekly meetings. Unfinished ones carry forward to the next week until they're ticked off.</p></div></section>
+  <section class="toolbar"><div class="grow"><input type="search" id="tq" placeholder="Search to-dos" aria-label="Search to-dos" value="${esc(S.tq||"")}"></div><button class="btn" data-act="export-xlsx">Export Excel</button></section>
+  <form class="addtodo" id="addTodoForm" aria-label="Add a to-do"><input type="text" id="nt_text" placeholder="Add a to-do" aria-label="To-do"><input type="text" id="nt_owner" placeholder="Owner" aria-label="Owner initials" list="ownerList" value="${esc(me)}"><input type="date" id="nt_due" aria-label="Due date"><button class="btn primary">Add</button>
+    <datalist id="ownerList">${people.map(i=>`<option value="${esc(i)}">`).join("")}</datalist></form>
+  <div class="frow"><div class="fchips" role="group" aria-label="Filter to-dos">${[["open","Open"],["week","Due this week"],["mine","Mine"],["overdue","Overdue"],["done","Done"],["all","All"]].filter(([v])=>v!=="mine"||me).map(([v,l])=>chip("tf",v,l,base.filter(F[v]).length,v==="overdue"?" late":"")).join("")}</div>
+    ${people.length?`<div class="fchips" role="group" aria-label="Owner">${chip("tpl","all","Everyone",base.filter(F[S.tf]||F.open).length)}${people.map(i=>chip("tpl",i,i,base.filter(F[S.tf]||F.open).filter(t=>initialsList(t.owner).includes(i)).length)).join("")}</div>`:""}</div>
+  <section>${todoListHTML(rows,{showProject:true,showMeeting:true})}</section>
+  <p class="source">${rows.length} to-do${rows.length===1?"":"s"} shown.</p>`;
+}
+
+/* Archive: completed and dropped projects (the Old Projects tab) */
+function renderArchive(){
+  const base=searched(S.projects.filter(p=>!isOpen(p)), S.aq);
+  const f=S.af||"all"; const rows=base.filter(p=>f==="all"||p.status===f).sort((a,b)=>String(b.closedAt||"").localeCompare(String(a.closedAt||"")));
+  const chip=(v,l,n)=>`<button type="button" class="fchip" data-act="af" data-v="${v}" aria-pressed="${f===v}">${l}<b>${n}</b></button>`;
+  return `
+  <section class="pagehead"><div><h2 class="action-title">Archive</h2><p class="sub">Completed projects (finished or sent out) and dropped projects (taken off the list without finishing). Open one to restore it.</p></div></section>
+  <section class="toolbar"><div class="grow"><input type="search" id="aq" placeholder="Search the archive" aria-label="Search the archive" value="${esc(S.aq)}"></div></section>
+  <div class="fchips">${chip("all","All",base.length)}${chip("Completed","Completed",base.filter(p=>p.status==="Completed").length)}${chip("Dropped","Dropped",base.filter(p=>p.status==="Dropped").length)}</div>
+  ${projectTableHTML(rows,{archive:true})}
+  <p class="source">${rows.length} archived project${rows.length===1?"":"s"} shown.</p>`;
+}
+
+/* Meetings: one per week, with a snapshot like the dated tabs */
+function renderMeetings(){
+  const ms=[...S.meetings].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  return `
+  <section class="pagehead"><div><h2 class="action-title">Meetings</h2><p class="sub">Each weekly meeting keeps a snapshot of the project list as it stood, like the dated tabs in the workbook.</p></div>
+    <div class="headacts"><button class="btn accent" data-act="import-tr">Import transcript</button><button class="btn" data-act="snapshot">Save a snapshot without a transcript</button></div></section>
+  ${ms.length?`<ul class="mlist">${ms.map(m=>{ const n=S.todos.filter(t=>t.meetingId===m.id).length;
+    return `<li class="click" data-act="open-meeting" data-id="${esc(m.id)}" tabindex="0"><span class="d">${esc(fmtDate(m.date))}</span><div><p><b>${esc(m.title||"Weekly meeting")}</b></p>${m.summary?`<p class="meta">${esc(m.summary)}</p>`:""}<p class="meta">${(m.snapshot||[]).length} projects in the snapshot${n?` · ${n} to-do${n===1?"":"s"}`:""}${m.source==="import"?" · imported from the workbook":m.source==="manual"?" · saved by hand":""}</p></div></li>`; }).join("")}</ul>`
+    :`<div class="empty"><p>No meetings yet. Import a transcript after your next weekly meeting, or import the workbook to bring in past weeks.</p></div>`}`;
+}
+
+/* What changed: change history for the last 7 days */
+async function loadChanges(){
+  S.changes={loading:true};
+  const since=new Date(Date.now()-7*DAY_MS).toISOString();
+  try{ const {data,error}=await S.sb.from("history").select("tbl,record_id,op,changes,changed_at,changed_by").eq("tbl","projects").gte("changed_at",since).order("changed_at",{ascending:false}).limit(300);
+    S.changes = error ? {err:error.message} : {rows:data||[]}; }catch(e){ S.changes={err:String(e&&e.message||e)}; }
+  if(S.view==="week") render();
+}
+function changesHTML(){
+  if(!S.changes){ loadChanges(); return `<p class="t2">Loading…</p>`; }
+  if(S.changes.loading) return `<p class="t2">Loading…</p>`;
+  if(S.changes.err) return `<p class="t2">Couldn't load the change log: ${esc(S.changes.err)}</p>`;
+  const items=[]; const B=t=>`<b>${esc(t)}</b>`;
+  for(const r of S.changes.rows){ const p=projById(r.record_id); const ch=r.changes||{}; const n=(p&&p.name)||(ch.doc&&ch.doc.name)||(ch.name&&(ch.name.to||ch.name.from))||"A deleted project";
+    const at=Date.parse(r.changed_at), id=p?p.id:null;
+    if(r.op==="insert") items.push({html:`New project: ${B(n)}`,at,id,by:r.changed_by});
+    else if(r.op==="delete") items.push({html:`${B(n)} deleted`,at,id:null,by:r.changed_by});
+    else { if(ch.status&&ch.status.from!==ch.status.to) items.push({html:`${B(n)}: ${esc(ch.status.from||"Active")} → ${esc(ch.status.to||"Active")}`,at,id,by:r.changed_by});
+      else if(ch.update) items.push({html:`${B(n)} update`,at,id,by:r.changed_by});
+      if(ch.category) items.push({html:`${B(n)} moved to ${esc(CAT_SHORT[ch.category.to]||ch.category.to||NO_CAT)}`,at,id,by:r.changed_by}); } }
+  // a bulk add (the workbook import) reads as one line, not one per project
+  const adds=items.filter(i=>i.html.startsWith("New project:"));
+  if(adds.length>5){ const keep=items.filter(i=>!adds.includes(i)); keep.push({html:`${adds.length} projects added`, at:adds[0].at, id:null, by:adds[0].by}); items.length=0; items.push(...keep.sort((a,b)=>b.at-a.at)); }
+  // one line per project and kind of change
+  const seen=new Set(); const list=items.filter(i=>{ const k=i.html; if(seen.has(k)) return false; seen.add(k); return true; }).slice(0,12);
+  if(!list.length) return `<p class="t2">Nothing changed in the last 7 days.</p>`;
+  return `<ul class="mlist">${list.map(i=>`<li${i.id?` class="click" data-act="open-project" data-id="${esc(i.id)}" tabindex="0"`:""}><span class="d">${esc(new Date(i.at).toLocaleDateString("en-GB",{day:"numeric",month:"short"}))}</span><div><p>${i.html}</p><p class="meta">${esc(nameOf(i.by))}</p></div></li>`).join("")}</ul>`;
+}
+
+/* ---------- drawer ---------- */
+function renderDrawer(){
+  const root=document.getElementById("drawerRoot"); const dr=S.drawer;
+  if(!dr){ if(root.innerHTML) root.innerHTML=""; return; }
+  if(dr.rendered){ if(dr.kind==="meeting"||(dr.kind==="transcript"&&dr.live)) { /* fall through to refresh */ } else return; }
+  dr.rendered=true;
+  const body = dr.kind==="project" ? projectFormHTML(dr) : dr.kind==="todo" ? todoFormHTML(dr) : dr.kind==="meeting" ? meetingHTML(dr) :
+    dr.kind==="transcript" ? transcriptHTML(dr) : dr.kind==="workbook" ? workbookHTML(dr) : dr.kind==="settings" ? settingsHTML() : dr.kind==="snapshot" ? snapshotHTML() : passwordFormHTML();
+  const key=dr.kind+":"+(dr.id||""), same=root.dataset.key===key && !!root.querySelector(".drawer");
+  const top=same?root.querySelector(".drawer-b")?.scrollTop||0:0;
+  root.innerHTML=`<div class="scrim" data-act="close"></div><aside class="drawer${["transcript","workbook","meeting"].includes(dr.kind)?" wide":""}${same?" still":""}" role="dialog" aria-modal="true" aria-labelledby="drTitle">${body}</aside>`;
+  root.dataset.key=key;
+  if(same){ const b=root.querySelector(".drawer-b"); if(b) b.scrollTop=top; }
+  if(dr.kind==="project"||dr.kind==="todo"){ renderDrAlert(); renderHistory(); loadHistory(dr); }
+  const f=root.querySelector("input:not([type=checkbox]):not([type=file]),textarea,select"); if(f && !same && dr.kind!=="meeting") f.focus();
+}
+function rerenderDrawer(){ if(S.drawer){ captureForm(); S.drawer.rendered=false; renderDrawer(); restoreForm(); } }
+function captureForm(){ const dr=S.drawer; if(!dr) return; dr.vals={}; document.querySelectorAll("#drawerRoot [id^=f_]:not([type=file])").forEach(e=>dr.vals[e.id]=e.type==="checkbox"?e.checked:e.value); readLinks(); }
+function restoreForm(){ const dr=S.drawer; if(!dr||!dr.vals) return; for(const [k,v] of Object.entries(dr.vals)){ const e=document.getElementById(k); if(e){ if(e.type==="checkbox") e.checked=v; else e.value=v; } } }
+function closeDrawer(){
+  const dr=S.drawer; if(dr&&dr.ctrl) dr.ctrl.abort();
+  const rec = dr && dr.id && ["project","todo","meeting"].includes(dr.kind);
+  S.drawer=null; renderDrawer();
+  if(rec && parseHash().kind){ if(S.pushed){ S.pushed=false; history.back(); return; } history.replaceState(null,"","#"+S.view); }
+}
+const drHead = (kicker, title, extra) => `<div class="drawer-h"><div style="flex:1;min-width:0"><div class="kicker">${kicker}</div><h2 id="drTitle">${title}</h2>${extra||""}</div><button class="btn ghost" data-act="close" aria-label="Close">Close</button></div>`;
+function savedLine(r){ if(!r||!r.updatedAt) return ""; return `<div class="lastsaved">Last saved ${esc(fmtAgo(r.updatedAt))} by ${esc(nameOf(r._by||r.updatedBy, r.updatedByName))}</div>`; }
+function sel(id,opts,cur,blank){ return `<select id="${id}">${blank!=null?`<option value="">${esc(blank)}</option>`:""}${opts.map(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; return `<option value="${esc(v)}"${v===cur?" selected":""}>${esc(l)}</option>`; }).join("")}</select>`; }
+
+/* Project editor */
+function projectFormHTML(dr){
+  const isNew=!dr.id; const p = isNew ? (dr.seed||{status:"Active"}) : (dr.orig||projById(dr.id)||{});
+  dr.links = dr.links || (p.links||[]).map(l=>({...l}));
+  const cat=p.category||"", todos=isNew?[]:sortTodos(S.todos.filter(t=>t.projectId===p.id));
+  return `${drHead(isNew?"New project":esc(catOf(p)), esc(p.name||"New project"), (isNew?"":savedLine(p)))}
+  <form class="drawer-b" id="projectForm" novalidate>
+    <div id="drAlert" role="alert"></div>
+    ${p.categoryCheck?`<div class="banner"><span>Claude filed this under <b>${esc(cat)}</b>${p.categoryReason?`: ${esc(p.categoryReason)}`:""}. Is that right?</span><button type="button" class="btn sm primary" data-act="cat-ok">Yes, it's right</button></div>`:""}
+    <div class="fgrid">
+      <label class="f full">Project<input type="text" id="f_name" value="${esc(p.name||"")}" placeholder="Project name"></label>
+      <label class="f">Category${sel("f_category",CATEGORIES,cat,NO_CAT)}</label>
+      <label class="f">Status${sel("f_status",STATUSES.map(s=>[s,`${s}: ${STATUS_HELP[s]}`]),p.status||"Active")}</label>
+      <label class="f" id="quarterWrap"${cat===BOARD?"":" hidden"}>Board quarter <em>(e.g. Q4 '26)</em><input type="text" id="f_quarter" value="${esc(p.quarter||"")}"></label>
+      <label class="f" id="stageWrap"${cat===EXTERNAL?"":" hidden"}>Deal stage <em>(optional)</em>${sel("f_stage",STAGES,p.stage||"","None")}</label>
+      <label class="f full">Description <em>(a line or two on what the project is; shown on the dashboard)</em><textarea id="f_description" rows="3">${esc(p.description||"")}</textarea></label>
+      <label class="f">Stakeholders<input type="text" id="f_stakeholders" value="${esc(p.stakeholders||"")}" placeholder="J. Zaffino, M. Amen"></label>
+      <label class="f">Corp Dev <em>(initials)</em><input type="text" id="f_corpDev" value="${esc(p.corpDev||"")}" placeholder="WL / ZT"></label>
+      <label class="f full">This week's update${p.updateDate?` <em>(last updated ${esc(fmtDate(p.updateDate))})</em>`:""}<textarea id="f_update" rows="5" placeholder="- What happened, what's next">${esc(p.update||"")}</textarea></label>
+    </div>
+    <div><h3 class="sec">Links</h3><div id="linkRows">${linkRowsHTML(dr.links)}</div><button type="button" class="btn sm" data-act="add-link">Add link</button>
+      <p class="source" style="margin-top:6px">Paste the SharePoint "Copy link" URL. Viewers need SharePoint access to open it.</p></div>
+    ${isNew?"":`<div><h3 class="sec">To-dos</h3>${todoListHTML(todos,{showMeeting:true})}
+      <div class="addtodo" style="margin-top:8px"><input type="text" id="pt_text" placeholder="Add a to-do for this project" aria-label="New to-do"><input type="text" id="pt_owner" placeholder="Owner" aria-label="Owner" value="${esc(myInitials())}"><input type="date" id="pt_due" aria-label="Due date"><button type="button" class="btn sm primary" data-act="add-ptodo">Add</button></div></div>
+    <div><h3 class="sec">History</h3><ul class="mlist hist" id="histList"></ul></div>`}
+  </form>
+  <div class="drawer-f">
+    ${isNew?"":(dr.confirmDelete?`<span class="over">Delete ${esc(p.name)} and its to-dos? To take it off the list, set the status to Completed or Dropped instead.</span><button class="btn danger sm" data-act="del-yes">Delete</button><button class="btn sm" data-act="del-no">Keep</button>`:`<button class="btn danger" data-act="del-ask">Delete</button>`)}
+    <span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="save-project">${isNew?"Create project":"Save changes"}</button>
+  </div>`;
+}
+function linkRowsHTML(ls){ return (ls||[]).map((l,i)=>`<div class="linkrow"><input type="text" data-li="${i}" data-lf="label" value="${esc(l.label||"")}" placeholder="Label" aria-label="Link label"><input type="url" data-li="${i}" data-lf="url" value="${esc(l.url||"")}" placeholder="https://yourco.sharepoint.com/..." aria-label="Link URL"><button type="button" class="btn sm ghost" data-act="rm-link" data-i="${i}">Remove</button></div>`).join("") || `<p class="t2">No links yet.</p>`; }
+function readLinks(){ const dr=S.drawer; if(!dr||!dr.links) return; document.querySelectorAll("#linkRows [data-li]").forEach(e=>{ const i=+e.dataset.li; if(dr.links[i]) dr.links[i][e.dataset.lf]=e.value; }); }
+function projectFormValues(){
+  readLinks(); const category=val("f_category");
+  return {name:val("f_name"), category, quarter:category===BOARD?val("f_quarter"):"", status:val("f_status")||"Active", stage:category===EXTERNAL?val("f_stage"):"",
+    description:val("f_description"), stakeholders:val("f_stakeholders"), corpDev:val("f_corpDev"), update:val("f_update"),
+    links:(S.drawer.links||[]).map(l=>({label:(l.label||"").trim(), url:(l.url||"").trim()})).filter(l=>l.url)};
+}
+
+/* To-do editor */
+function todoFormHTML(dr){
+  const isNew=!dr.id; const t = isNew ? (dr.seed||{}) : (dr.orig||S.todos.find(x=>x.id===dr.id)||{});
+  const projs=[...S.projects].sort((a,b)=>(isOpen(b)-isOpen(a))||String(a.name).localeCompare(String(b.name)));
+  return `${drHead(isNew?"New to-do":"To-do", esc(t.text||"New to-do"), isNew?"":savedLine(t))}
+  <form class="drawer-b" id="todoForm" novalidate>
+    <div id="drAlert" role="alert"></div>
+    <div class="fgrid">
+      <label class="f full">To-do<input type="text" id="f_text" value="${esc(t.text||"")}"></label>
+      <label class="f">Owner <em>(initials)</em><input type="text" id="f_owner" value="${esc(t.owner||"")}" list="ownerList2"><datalist id="ownerList2">${teamInitials().map(i=>`<option value="${esc(i)}">`).join("")}</datalist></label>
+      <label class="f">Due<input type="date" id="f_due" value="${esc(t.due||"")}"></label>
+      <label class="f full">Project${sel("f_projectId",projs.map(p=>[p.id,p.name+(isOpen(p)?"":` (${p.status})`)]),t.projectId||"","No project")}</label>
+      <label class="chk full"><input type="checkbox" id="f_done"${t.done?" checked":""}> Done</label>
+      <label class="f full">Notes<textarea id="f_notes" rows="3">${esc(t.notes||"")}</textarea></label>
+    </div>
+    ${t.quote?`<p class="source">From the transcript: "${esc(t.quote)}"</p>`:""}
+    ${t.meetingDate?`<p class="t2" style="margin:0">Added from the meeting on ${esc(fmtDate(t.meetingDate))}.</p>`:""}
+    ${isNew?"":`<div><h3 class="sec">History</h3><ul class="mlist hist" id="histList"></ul></div>`}
+  </form>
+  <div class="drawer-f">${isNew?"":(dr.confirmDelete?`<span class="over">Delete this to-do?</span><button class="btn danger sm" data-act="del-yes">Delete</button><button class="btn sm" data-act="del-no">Keep</button>`:`<button class="btn danger" data-act="del-ask">Delete</button>`)}
+    <span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="save-todo">${isNew?"Add to-do":"Save changes"}</button></div>`;
+}
+function todoFormValues(){ return {text:val("f_text"), owner:val("f_owner").toUpperCase(), due:val("f_due"), projectId:val("f_projectId"), done:!!document.getElementById("f_done")?.checked, notes:val("f_notes")}; }
+
+/* Meeting snapshot */
+function meetingHTML(dr){
+  const m=S.meetings.find(x=>x.id===dr.id); if(!m) return drHead("Meeting","Not found");
+  const snap=(m.snapshot||[]).map(s=>({...s, id:s.id||"", status:s.status||"Active"}));
+  const todos=sortTodos(S.todos.filter(t=>t.meetingId===m.id));
+  return `${drHead("Weekly meeting", esc(fmtDate(m.date))+(m.title?`: ${esc(m.title)}`:""))}
+  <div class="drawer-b">
+    ${m.summary?`<div><h3 class="sec">Summary</h3><p class="prose">${esc(m.summary)}</p></div>`:""}
+    <div><h3 class="sec">Project list as it stood</h3>${snap.length?projectTableHTML(snap.map(s=>({...s, updateDate:"", createdInMeeting:null})),{grouped:true,archive:false}).replace(/data-act="open-project"/g,'data-act="open-project-snap"'):'<p class="t2">No snapshot.</p>'}</div>
+    <div><h3 class="sec">To-dos from this meeting</h3>${todoListHTML(todos,{showProject:true})}</div>
+  </div>
+  <div class="drawer-f">${dr.confirmDelete?`<span class="over">Delete this meeting's snapshot? Projects and to-dos stay.</span><button class="btn danger sm" data-act="del-meeting-yes">Delete</button><button class="btn sm" data-act="del-no">Keep</button>`:`<button class="btn danger" data-act="del-ask">Delete snapshot</button>`}<span class="sp"></span><button class="btn" data-act="close">Close</button></div>`;
+}
+function snapshotHTML(){
+  return `${drHead("Meetings","Save a snapshot")}
+  <form class="drawer-b" id="snapForm" novalidate><p style="margin:0">Saves the current project list as that week's snapshot, for a week you updated by hand rather than from a transcript.</p>
+    <label class="f">Meeting date<input type="date" id="f_sdate" value="${TODAY()}"></label>
+    <label class="f">Summary <em>(optional)</em><textarea id="f_ssum" rows="3"></textarea></label></form>
+  <div class="drawer-f"><span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="snap-save">Save snapshot</button></div>`;
+}
+
+/* Settings: Claude's category filing */
+function catStats(){ const fromClaude=S.projects.filter(p=>p.categorySource==="claude"||p.categoryCorrected); const fixed=fromClaude.filter(p=>p.categoryCorrected); return {n:fromClaude.length, fixed:fixed.length}; }
+function settingsHTML(){
+  const st=catStats(), auto=!!(S.settings.claude&&S.settings.claude.autoCategory);
+  return `${drHead("Settings","Categories")}
+  <div class="drawer-b">
+    <p style="margin:0">When Claude finds a new project in a transcript, it suggests a category using your definitions and the projects you've already categorised. Every time someone changes its suggestion, that correction is used as an example next time.</p>
+    <div class="tiles" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div class="tile"><b class="c-blue">${st.n}</b><span>Categories suggested by Claude</span></div><div class="tile"><b class="c-mag">${st.n?Math.round((st.n-st.fixed)/st.n*100)+"%":"n/d"}</b><span>Kept without a change</span><small>${st.fixed} corrected</small></div></div>
+    <label class="chk"><input type="checkbox" id="f_auto"${auto?" checked":""}> <span><b>File categories automatically.</b> New projects from a transcript are saved under Claude's category without asking, and tagged "Check category" on the dashboard until someone confirms it. When off, you confirm each new project's category before saving.</span></label>
+  </div>
+  <div class="drawer-f"><span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="save-settings">Save</button></div>`;
+}
+
+function passwordFormHTML(){
+  return `${drHead("Your login","Change password")}
+  <form class="drawer-b" id="pwForm" novalidate>
+    <p style="margin:0">Signed in as <b>${esc(S.session?.username||"")}</b>. Use at least 12 characters.</p>
+    <label class="f">New password<input type="password" id="p_new" autocomplete="new-password"></label>
+    <label class="f">Repeat new password<input type="password" id="p_again" autocomplete="new-password"></label>
+  </form>
+  <div class="drawer-f"><span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="save-pw">Save password</button></div>`;
+}
+async function savePassword(){
+  const a=document.getElementById("p_new").value, b=document.getElementById("p_again").value;
+  if(a.length<12){ toast("Use at least 12 characters."); return; }
+  if(a!==b){ toast("The two passwords don't match."); return; }
+  const {error}=await S.sb.auth.updateUser({password:a});
+  if(error){ toast(error.message || "Couldn't change the password. Try again."); return; }
+  toast("Password changed"); closeDrawer();
+}
+
+/* ---------- writes ---------- */
+async function guard(fn, okMsg){
+  try{ await fn(); if(okMsg) toast(okMsg); return true; }
+  catch(e){
+    const c=e&&e.code;
+    if(c==="42501"||c==="denied") toast("Your login can't change the tracker. Ask the tracker owner to check it's set up.");
+    else if(c==="not_found") toast("That record was deleted by someone else. The list has been refreshed.");
+    else toast((e&&e.message) ? "Couldn't save: "+e.message : "Couldn't save. Check your connection and try again.");
+    return false;
+  }
+}
+const meta = () => ({updatedAt:Date.now(), updatedBy:S.meId||"", updatedByName:S.session?.name||""});
+const META_KEYS=["id","_v","_by"];
+function stripMeta(o){ const r={...(o||{})}; META_KEYS.forEach(k=>delete r[k]); return r; }
+const normV = v => v==null ? "" : v;
+function same(a,b){ a=normV(a); b=normV(b); return (typeof a==="object"||typeof b==="object") ? JSON.stringify(a)===JSON.stringify(b) : String(a)===String(b); }
+
+/* Compare-and-set on updated_at, so two people saving at once never overwrite each other silently.
+   build(row) returns {doc} to write, or {stop:true,...} to write nothing. One retry if someone saves in between. */
+async function latestRow(table,id){ const {data,error}=await S.sb.from(table).select("id,doc,updated_at,updated_by").eq("id",id).maybeSingle(); if(error) throw error; return data||null; }
+async function casWrite(table,id,build,{quiet}={}){
+  let last=null;
+  for(let i=0;i<2;i++){
+    const row=await latestRow(table,id); if(!row){ await refetch(table); throw {code:"not_found"}; }
+    const r=build(row); if(!r||r.stop) return r||{stop:true};
+    const {data,error}=await S.sb.from(table).update({doc:stripMeta(r.doc)}).eq("id",id).eq("updated_at",row.updated_at).select("id");
+    if(error) throw error;
+    if(data&&data.length){ if(!quiet) await refetch(table); return {ok:true}; }
+    last=row;
+  }
+  const now=await latestRow(table,id);
+  if(now && last && now.updated_at===last.updated_at) throw {code:"denied"};
+  throw {message:"someone else keeps saving this record. Wait a moment and try again"};
+}
+function makeDb(sb){
+  return { collection(table){ return { doc(id){ return {
+    async set(body,{quiet}={}){ const {error}=await sb.from(table).upsert({id, doc:body}); if(error) throw error; if(!quiet) await refetch(table); },
+    async update(patch,{quiet}={}){ await casWrite(table, id, row=>({doc:{...(row.doc||{}), ...patch}}), {quiet}); },
+    async delete(){ const {data, error}=await sb.from(table).delete().eq("id", id).select("id"); if(error) throw error; if(!data||!data.length) throw {code:"denied"}; await refetch(table); }
+  }; } }; } };
+}
+
+function openEditor(kind,id){
+  const rec=(kind==="project"?S.projects:S.todos).find(x=>x.id===id); if(!rec) return;
+  S.drawer={kind, id, orig:JSON.parse(JSON.stringify(rec))}; renderDrawer();
+  S.drawer.base = kind==="project" ? projectFormValues() : todoFormValues();
+}
+function whoChanged(row){ const d=row.doc||{}; return nameOf(row.updated_by, d.updatedByName); }
+function showVal(k,v){
+  if(k==="links"){ const a=Array.isArray(v)?v:[]; return a.map(l=>l.label||l.url).join(", ")||"none"; }
+  if(k==="projectId") return (projById(v)||{}).name||"none";
+  if(k==="done") return v?"done":"not done";
+  v=normV(v); if(v==="") return "blank";
+  if(k==="due"||/Date$|At$/.test(k)) return fmtDate(v);
+  v=String(v); return v.length>140 ? v.slice(0,140)+"…" : v;
+}
+function setFormField(k,v){
+  const dr=S.drawer;
+  if(k==="links"){ dr.links=(Array.isArray(v)?v:[]).map(l=>({...l})); const el=document.getElementById("linkRows"); if(el) el.innerHTML=linkRowsHTML(dr.links); return; }
+  const e=document.getElementById("f_"+k); if(!e) return; if(e.type==="checkbox") e.checked=!!v; else e.value=normV(v);
+}
+function renderDrAlert(){
+  const el=document.getElementById("drAlert"); const dr=S.drawer; if(!el||!dr) return;
+  const noun=dr.kind==="todo"?"to-do":"project";
+  if(dr.gone){ el.innerHTML=`<div class="conflict"><h3>This ${noun} was deleted by someone else</h3><p>Your changes are still in the form. Recreate it with them, or discard them.</p>
+    <div class="acts"><button type="button" class="btn sm primary" data-act="gone-recreate">Recreate it</button><button type="button" class="btn sm" data-act="close">Discard my changes</button></div></div>`; return; }
+  if(dr.conflicts && dr.conflicts.length){
+    el.innerHTML=`<div class="conflict"><h3>Someone else saved this ${noun} while you were editing</h3><p>Choose which value to keep for each field, then save. Their other changes are kept.</p>
+    ${dr.conflicts.map((c,i)=>`<div class="cf"><div>${esc(c.who)} changed <b>${esc(FIELD_LABELS[c.k]||c.k)}</b> to <b>${esc(showVal(c.k,c.theirs))}</b>; you have <b>${esc(showVal(c.k,c.mine))}</b>.</div>
+      <div class="acts"><button type="button" class="btn sm${c.choice==="theirs"?" on":""}" data-act="cf-pick" data-i="${i}" data-c="theirs" aria-pressed="${c.choice==="theirs"}">Keep theirs</button><button type="button" class="btn sm${c.choice==="mine"?" on":""}" data-act="cf-pick" data-i="${i}" data-c="mine" aria-pressed="${c.choice==="mine"}">Use mine</button></div></div>`).join("")}
+    <div><button type="button" class="btn sm primary" data-act="save-${dr.kind}">Save</button></div></div>`; return; }
+  el.innerHTML="";
+}
+async function saveRecord(kind){
+  const dr=S.drawer; if(!dr) return; const table=kind+"s";
+  const read=()=>kind==="project"?projectFormValues():todoFormValues();
+  const v=read();
+  if(kind==="project"){ if(!v.name){ toast("Give the project a name."); return; } const bad=v.links.find(l=>!safeUrl(l.url)); if(bad){ toast(`"${bad.url}" is not a web address. Paste the full https:// link.`); return; } }
+  else if(!v.text){ toast("Write the to-do first."); return; }
+  const m=meta();
+  if(!dr.id){
+    const id=(kind==="project"?"p":"t")+uid();
+    const body={...v, createdAt:Date.now(), createdBy:S.meId||"", ...m};
+    if(kind==="project"){ body.updateDate=v.update?TODAY():""; body.categorySource=v.category?"person":""; if(!OPEN.includes(v.status)) body.closedAt=TODAY(); }
+    if(kind==="todo"&&v.done) body.doneAt=TODAY();
+    if(await guard(()=>S.db.collection(table).doc(id).set(body), kind==="project"?"Project created":"To-do added")) closeDrawer();
+    return;
+  }
+  if(dr.gone){ toast("Choose Recreate it or Discard my changes."); return; }
+  if(dr.conflicts){
+    if(dr.conflicts.some(c=>!c.choice)){ toast("Choose Keep theirs or Use mine for each field."); return; }
+    for(const c of dr.conflicts){ dr.orig[c.k]=c.theirs; if(c.choice==="theirs") setFormField(c.k,c.theirs); }
+    const now=read(); for(const c of dr.conflicts) if(c.choice==="theirs") dr.base[c.k]=now[c.k];
+    dr.conflicts=null; renderDrAlert();
+  }
+  const mine=read();
+  const changed=Object.keys(mine).filter(k=>!same(mine[k],dr.base[k]));
+  if(!changed.length){ toast("No changes to save"); closeDrawer(); return; }
+  try{
+    const r=await casWrite(table, dr.id, row=>{
+      const latest=row.doc||{};
+      const cs=changed.filter(k=>!same(latest[k],dr.orig[k]) && !same(mine[k],latest[k])).map(k=>({k, theirs:latest[k], mine:mine[k], who:whoChanged(row)}));
+      if(cs.length) return {stop:true, conflicts:cs};
+      const doc={...stripMeta(latest), ...Object.fromEntries(changed.map(k=>[k,mine[k]])), ...m};
+      if(kind==="project"){
+        if(changed.includes("update")) doc.updateDate=TODAY();
+        if(changed.includes("status")){ if(OPEN.includes(mine.status)) doc.closedAt=""; else if(OPEN.includes(latest.status||"Active")) doc.closedAt=TODAY(); }
+        if(changed.includes("category")){ doc.categoryCheck=false; if(latest.categorySource==="claude"){ doc.categoryCorrected=true; doc.categorySuggested=latest.category; } doc.categorySource="person"; }
+      } else if(changed.includes("done")) doc.doneAt = mine.done ? TODAY() : "";
+      return {doc};
+    });
+    if(r.conflicts){ if(S.drawer===dr){ dr.conflicts=r.conflicts; renderDrAlert(); document.getElementById("drAlert")?.scrollIntoView({block:"nearest"}); } return; }
+    toast("Saved"); if(S.drawer===dr) closeDrawer();
+  }catch(e){
+    if(e&&e.code==="not_found"){ if(S.drawer===dr){ dr.gone=true; renderDrAlert(); } return; }
+    await guard(()=>{ throw e; });
+  }
+}
+async function recreateRecord(){
+  const dr=S.drawer; if(!dr||!dr.gone) return; const kind=dr.kind;
+  const body={...stripMeta(dr.orig), ...(kind==="project"?projectFormValues():todoFormValues()), ...meta()};
+  if(await guard(()=>S.db.collection(kind+"s").doc(dr.id).set(body), "Recreated")) closeDrawer();
+}
+async function deleteRecord(){
+  const dr=S.drawer; if(!dr||!dr.id) return;
+  if(dr.kind==="project"){ const ts=S.todos.filter(t=>t.projectId===dr.id);
+    if(await guard(async()=>{ await S.db.collection("projects").doc(dr.id).delete(); for(const t of ts) await S.db.collection("todos").doc(t.id).delete(); }, "Project deleted")) closeDrawer(); }
+  else if(dr.kind==="todo"){ if(await guard(()=>S.db.collection("todos").doc(dr.id).delete(), "To-do deleted")) closeDrawer(); }
+  else if(dr.kind==="meeting"){ if(await guard(()=>S.db.collection("meetings").doc(dr.id).delete(), "Snapshot deleted")) closeDrawer(); }
+}
+async function toggleTodo(id, done){
+  const ok=await guard(()=>S.db.collection("todos").doc(id).update({done, doneAt:done?TODAY():"", ...meta()}));
+  if(ok) toast(done?"Done":"Reopened");
+  if(S.drawer && S.drawer.kind==="project"){ S.drawer.rendered=false; captureForm(); renderDrawer(); restoreForm(); }
+}
+async function addTodo({text, owner, due, projectId}){
+  text=String(text||"").trim(); if(!text){ toast("Write the to-do first."); return false; }
+  const lm=latestMeeting();
+  return guard(()=>S.db.collection("todos").doc("t"+uid()).set({text, owner:String(owner||"").trim().toUpperCase(), due:due||"", projectId:projectId||"", done:false, notes:"",
+    meetingId:"", meetingDate:lm&&lm.date>=addDays(TODAY(),-7)?lm.date:"", createdAt:Date.now(), createdBy:S.meId||"", ...meta()}), "To-do added");
+}
+function snapshotRows(date){
+  return S.projects.filter(p=>isOpen(p) || p.closedAt===date).map(p=>({id:p.id, name:p.name, category:p.category||"", quarter:p.quarter||"", status:p.status||"Active", stage:p.stage||"",
+    description:p.description||"", stakeholders:p.stakeholders||"", corpDev:p.corpDev||"", update:p.update||""}));
+}
+async function saveMeeting(date, {summary, source, title}){
+  const id="m"+date; const ex=S.meetings.find(m=>m.id===id);
+  const doc={...(ex?stripMeta(ex):{createdAt:Date.now(), createdBy:S.meId||""}), date, title:title||(ex&&ex.title)||"Weekly meeting", source:(ex&&ex.source)||source,
+    summary:[ex&&ex.summary, summary].filter(Boolean).join(" ").trim(), snapshot:snapshotRows(date), ...meta()};
+  await S.db.collection("meetings").doc(id).set(doc);
+  return id;
+}
+
+/* ---------- history ---------- */
+async function loadHistory(dr){
+  if(!dr||!dr.id||!S.sb) return; const key=dr.kind+":"+dr.id; if(S.hist[key]&&S.hist[key].at>Date.now()-2000) return;
+  try{ const {data,error}=await S.sb.from("history").select("op,changes,changed_at,changed_by").eq("tbl",dr.kind+"s").eq("record_id",dr.id).order("changed_at",{ascending:false}).limit(40);
+    S.hist[key] = error ? {err:error.message, at:Date.now()} : {rows:data||[], at:Date.now()}; }catch(e){ S.hist[key]={err:String(e&&e.message||e), at:Date.now()}; }
+  renderHistory();
+}
+function changeLines(row){
+  if(row.op==="insert") return ["Created"]; if(row.op==="delete") return ["Deleted"];
+  return Object.entries(row.changes||{}).filter(([k])=>!["updateDate","doneAt","closedAt","categorySource","categoryCheck","categoryCorrected","categorySuggested","categoryReason","createdInMeeting"].includes(k)).map(([k,c])=>{ const L=FIELD_LABELS[k]||k;
+    if(LONG_FIELDS.includes(k)) return `${L} edited`; return `${L}: ${showVal(k,c&&c.from)} → ${showVal(k,c&&c.to)}`; });
+}
+function renderHistory(){
+  const el=document.getElementById("histList"); const dr=S.drawer; if(!el||!dr||!dr.id) return;
+  const h=S.hist[dr.kind+":"+dr.id];
+  if(!h){ el.innerHTML=`<li><span class="d"></span><p class="t2">Loading history…</p></li>`; return; }
+  if(h.err){ el.innerHTML=`<li><span class="d"></span><p class="t2">Couldn't load the history: ${esc(h.err)}</p></li>`; return; }
+  const rows=h.rows.map(r=>({r, lines:changeLines(r)})).filter(x=>x.lines.length);
+  el.innerHTML = rows.length ? rows.map(({r,lines})=>`<li><span class="d">${esc(fmtWhen(Date.parse(r.changed_at)))}</span><div>${lines.map(l=>`<p>${esc(l)}</p>`).join("")}<p class="meta">${esc(nameOf(r.changed_by))}</p></div></li>`).join("") : `<li><span class="d"></span><p class="t2">No changes recorded yet.</p></li>`;
+}
+
+/* ---------- transcript: read with Claude, review, save ---------- */
+function transcriptHTML(dr){
+  const head=drHead("Weekly meeting","Import transcript");
+  if(dr.step==="busy") return `${head}<div class="drawer-b"><div class="busy" role="status"><span class="spin" aria-hidden="true"></span><div><b>Claude is reading the transcript.</b><div class="t2">This usually takes one to three minutes. Keep this panel open.</div></div></div></div>
+    <div class="drawer-f"><span class="sp"></span><button class="btn" data-act="tr-cancel">Cancel</button></div>`;
+  if(dr.step==="review") return head+reviewHTML(dr);
+  return `${head}
+  <form class="drawer-b" id="trForm" novalidate>
+    <p style="margin:0">In Teams, open the meeting's <b>Recap</b>, then <b>Transcript</b>, and download it (.docx or .vtt). Drop the file here or paste the text. Claude proposes status updates, new projects, projects to archive and the week's to-dos; nothing is saved until you review and accept it. The transcript itself isn't stored.</p>
+    <div class="fgrid">
+      <label class="f">Meeting date<input type="date" id="f_mdate" value="${esc(dr.date||TODAY())}"></label>
+      <label class="f">Transcript file <em>(.docx, .vtt or .txt)</em><input type="file" id="f_tfile" accept=".docx,.vtt,.txt,text/plain,text/vtt,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
+      <label class="f full">Or paste the transcript<textarea id="f_ttext" rows="14" placeholder="Paste the meeting transcript here">${esc(dr.text||"")}</textarea></label>
+    </div>
+    <p class="t2" id="trInfo" style="margin:0">${dr.text?`${dr.text.length.toLocaleString("en-US")} characters`:""}</p>
+    ${dr.err?`<p class="err" role="alert">${esc(dr.err)}</p>`:""}
+  </form>
+  <div class="drawer-f"><span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn accent" data-act="tr-read">Read with Claude</button></div>`;
+}
+async function readTranscriptFile(file){
+  const name=(file.name||"").toLowerCase();
+  if(name.endsWith(".docx")){
+    await loadScript(JSZIP_SRC,"Word file");
+    const zip=await window.JSZip.loadAsync(await file.arrayBuffer()); const xml=await zip.file("word/document.xml")?.async("string");
+    if(!xml) throw new Error("that Word file has no text");
+    const doc=new DOMParser().parseFromString(xml,"application/xml");
+    return [...doc.getElementsByTagName("w:p")].map(p=>[...p.getElementsByTagName("w:t")].map(t=>t.textContent).join("")).join("\n").replace(/\n{3,}/g,"\n\n").trim();
+  }
+  const raw=await file.text();
+  if(name.endsWith(".vtt")||/^WEBVTT/.test(raw)) return vttToText(raw);
+  return raw.trim();
+}
+function vttToText(raw){
+  const out=[]; let last="";
+  for(const line of raw.split(/\r?\n/)){ const l=line.trim(); if(!l||l==="WEBVTT"||/-->/.test(l)||/^\d+$/.test(l)||/^NOTE\b/.test(l)||/^[0-9a-f-]{20,}(\/\d+-\d+)?$/i.test(l)) continue;
+    const m=l.match(/^<v ([^>]+)>(.*?)(<\/v>)?$/); const who=m?m[1].trim():"", txt=(m?m[2]:l).replace(/<[^>]+>/g,"").trim(); if(!txt) continue;
+    if(who && who===last) out[out.length-1]+=" "+txt; else { out.push(who?`${who}: ${txt}`:txt); last=who; } }
+  return out.join("\n");
+}
+function claudeInput(date, transcript){
+  const team=Object.values(S.profiles).map(p=>({name:p.name, initials:p.initials||""}));
+  teamInitials().forEach(i=>{ if(!team.some(t=>String(t.initials).toUpperCase()===i)) team.push({name:"", initials:i}); });
+  const examples=S.projects.filter(p=>CATEGORIES.includes(p.category)).sort((a,b)=>(!!b.categoryCorrected-!!a.categoryCorrected)||(b.updatedAt||0)-(a.updatedAt||0)).slice(0,300)
+    .map(p=>({name:p.name, category:p.category, description:String(p.description||"").slice(0,300), corrected:!!p.categoryCorrected}));
+  return {meetingDate:date, transcript,
+    projects:S.projects.filter(isOpen).map(p=>({id:p.id, name:p.name, category:p.category||"", quarter:p.quarter||"", description:p.description||"", stakeholders:p.stakeholders||"", corpDev:p.corpDev||"", status:p.status||"Active", update:p.update||"", stage:p.stage||""})),
+    examples, openTodos:S.todos.filter(t=>!t.done).map(t=>({id:t.id, text:t.text, owner:t.owner||"", projectId:t.projectId||"", due:t.due||""})), team};
+}
+async function readWithClaude(){
+  const dr=S.drawer; dr.date=val("f_mdate"); dr.text=document.getElementById("f_ttext").value.trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dr.date)){ dr.err="Choose the meeting date."; rerenderDrawer(); return; }
+  if(!dr.text){ dr.err="Add the transcript first: drop the file or paste the text."; rerenderDrawer(); return; }
+  dr.err=""; dr.step="busy"; dr.ctrl=new AbortController(); dr.rendered=false; renderDrawer();
+  try{
+    const {data:{session}}=await S.sb.auth.getSession(); if(!session) throw new Error("Your session ended. Sign in again.");
+    const res=await fetch(CFG.supabaseUrl+"/functions/v1/transcript",{method:"POST", signal:dr.ctrl.signal,
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token,"apikey":CFG.supabaseAnonKey}, body:JSON.stringify(claudeInput(dr.date, dr.text))});
+    let body=null; try{ body=await res.json(); }catch{}
+    if(!res.ok) throw new Error((body&&body.error)||(res.status===404?"The transcript reader isn't set up yet. Ask the tracker owner (README step 2).":`Request failed (${res.status})`));
+    if(S.drawer!==dr) return;
+    dr.rv=prepareReview(body.proposal); dr.step="review"; dr.ctrl=null; dr.rendered=false; renderDrawer();
+  }catch(e){ if(S.drawer!==dr) return; dr.ctrl=null; dr.step="input"; dr.err=e&&e.name==="AbortError"?"Cancelled.":(e&&e.message)||"Claude couldn't read it. Try again."; dr.rendered=false; renderDrawer(); }
+}
+function prepareReview(p){
+  const auto=!!(S.settings.claude&&S.settings.claude.autoCategory);
+  return {summary:p.summary||"",
+    u:(p.project_updates||[]).map(x=>({...x, take:true})),
+    n:(p.new_projects||[]).map(x=>({...x, take:true, suggested:x.category, catOk:auto})),
+    a:(p.archive||[]).map(x=>({...x, take:true})),
+    t:(p.todos||[]).map(x=>({...x, take:true})),
+    d:(p.todos_done||[]).map(x=>({...x, take:true}))};
+}
+function reviewHTML(dr){
+  const rv=dr.rv, auto=!!(S.settings.claude&&S.settings.claude.autoCategory);
+  const box=(k,i,label)=>`<label class="chk"><input type="checkbox" data-rv="${k}.${i}.take"${rv[k][i].take?" checked":""}> ${label}</label>`;
+  const inp=(k,i,f,ph,type)=>`<input type="${type||"text"}" data-rv="${k}.${i}.${f}" value="${esc(rv[k][i][f]||"")}" placeholder="${esc(ph||"")}" aria-label="${esc(ph||f)}">`;
+  const ta=(k,i,f,rows)=>`<textarea data-rv="${k}.${i}.${f}" rows="${rows||3}" aria-label="${esc(f)}">${esc(rv[k][i][f]||"")}</textarea>`;
+  const selr=(k,i,f,opts,blank)=>`<select data-rv="${k}.${i}.${f}" aria-label="${esc(f)}">${blank!=null?`<option value="">${esc(blank)}</option>`:""}${opts.map(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; return `<option value="${esc(v)}"${v===rv[k][i][f]?" selected":""}>${esc(l)}</option>`; }).join("")}</select>`;
+  const pname=id=>(projById(id)||{}).name||"A project";
+  const projOpts=[...S.projects.filter(isOpen).map(p=>[p.id,p.name]), ...rv.n.filter(n=>n.take&&n.name).map(n=>[n.name,n.name+" (new)"])];
+  const total=["u","n","a","t","d"].reduce((s,k)=>s+rv[k].filter(x=>x.take).length,0);
+  const sec=(title,n,inner)=>`<div><h3 class="sec">${title} <span class="n">${n}</span></h3>${n?`<div style="display:flex;flex-direction:column;gap:10px">${inner}</div>`:`<p class="t2">None.</p>`}</div>`;
+  return `<div class="drawer-b" id="rvBody">
+    <div class="banner"><span>Meeting on <b>${esc(fmtDate(dr.date))}</b>. Untick anything you don't want, edit anything that's off, then save. ${rv.summary?`<br>${esc(rv.summary)}`:""}</span></div>
+    ${sec("Project updates", rv.u.length, rv.u.map((u,i)=>{ const p=projById(u.project_id)||{}; const ext=catOf(p)===EXTERNAL;
+      return `<div class="rv${u.take?"":" off"}"><div class="rh">${box("u",i,esc(p.name||"Project"))}${statusPill(p.status)}</div>
+        ${p.update?`<div class="old" title="Last week's update">${esc(p.update)}</div>`:""}
+        <div class="rvgrid"><label class="f full">New update${ta("u",i,"update",4)}</label>
+          <label class="f">Status${selr("u",i,"status",OPEN.map(s=>[s,s]),`No change (${p.status||"Active"})`)}</label>
+          ${ext?`<label class="f">Deal stage${selr("u",i,"stage",STAGES,`No change${p.stage?` (${p.stage})`:""}`)}</label>`:""}
+          ${u.description?`<label class="f full">New description${ta("u",i,"description",2)}</label>`:""}
+          ${u.corp_dev?`<label class="f">Corp Dev${inp("u",i,"corp_dev")}</label>`:""}${u.stakeholders?`<label class="f">Stakeholders${inp("u",i,"stakeholders")}</label>`:""}</div>
+        ${u.reason?`<div class="why">${esc(u.reason)}</div>`:""}</div>`; }).join(""))}
+    ${sec("New projects", rv.n.length, rv.n.map((n,i)=>`<div class="rv n${n.take?"":" off"}"><div class="rh">${box("n",i,"Add as a new project")}</div>
+        <div class="rvgrid"><label class="f full">Project${inp("n",i,"name","Project name")}</label>
+          <label class="f">Category${selr("n",i,"category",CATEGORIES)}</label>
+          <label class="f">Status${selr("n",i,"status",OPEN)}</label>
+          ${n.category===BOARD?`<label class="f">Board quarter${inp("n",i,"quarter","Q4 '26")}</label>`:n.category===EXTERNAL?`<label class="f">Deal stage${selr("n",i,"stage",STAGES,"None")}</label>`:"<span></span>"}
+          <div class="full why">Claude suggested <b>${esc(n.suggested)}</b>${n.category_reason?`: ${esc(n.category_reason)}`:""}</div>
+          ${auto?"":`<label class="chk full"><input type="checkbox" data-rv="n.${i}.catOk"${n.catOk?" checked":""}> The category is right</label>`}
+          <label class="f full">Description${ta("n",i,"description",2)}</label>
+          <label class="f">Corp Dev${inp("n",i,"corp_dev","WL / ZT")}</label><label class="f">Stakeholders${inp("n",i,"stakeholders")}</label><span></span>
+          <label class="f full">Update${ta("n",i,"update",3)}</label></div></div>`).join(""))}
+    ${sec("Take off the list", rv.a.length, rv.a.map((a,i)=>`<div class="rv a${a.take?"":" off"}"><div class="rh">${box("a",i,esc(pname(a.project_id)))}<label class="f" style="min-width:150px">${selr("a",i,"status",[["Completed","Completed"],["Dropped","Dropped"]])}</label></div>${a.reason?`<div class="why">${esc(a.reason)}</div>`:""}</div>`).join(""))}
+    ${sec("To-dos for the week", rv.t.length, `<div>${rv.t.map((t,i)=>`<div class="rvtodo${t.take?"":" off"}"><input type="checkbox" data-rv="t.${i}.take"${t.take?" checked":""} aria-label="Add this to-do">${inp("t",i,"text","To-do")}${inp("t",i,"owner","Owner")}
+        <select data-rv="t.${i}.project_ref" aria-label="Project"><option value="">No project</option>${projOpts.map(([v,l])=>`<option value="${esc(v)}"${v===t.project_ref?" selected":""}>${esc(l)}</option>`).join("")}</select>${inp("t",i,"due","Due","date")}
+        ${t.quote?`<div class="q">"${esc(t.quote)}"</div>`:""}</div>`).join("")}</div>`)}
+    ${sec("Open to-dos the meeting said are done", rv.d.length, rv.d.map((d,i)=>{ const t=S.todos.find(x=>x.id===d.todo_id)||{}; return `<div class="rv a${d.take?"":" off"}"><div class="rh">${box("d",i,`Mark done: ${esc(t.text||"to-do")}`)}</div>${d.reason?`<div class="why">${esc(d.reason)}</div>`:""}</div>`; }).join(""))}
+  </div>
+  <div class="drawer-f"><button class="btn" data-act="tr-back">Back</button><span class="sp"></span><span class="t2">${total} change${total===1?"":"s"} selected</span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="tr-save">Save and record the meeting</button></div>`;
+}
+async function applyReview(){
+  const dr=S.drawer, rv=dr.rv, date=dr.date, auto=!!(S.settings.claude&&S.settings.claude.autoCategory);
+  const N=rv.n.filter(n=>n.take&&String(n.name).trim());
+  if(!auto && N.some(n=>!n.catOk)){ toast("Tick \"The category is right\" for each new project, or change its category first."); return; }
+  const mid="m"+date; const m=meta(); let made=0;
+  const ok=await guard(async()=>{
+    const nameToId={};
+    for(const n of N){ const id="p"+uid(); nameToId[n.name]=id; const changed=n.category!==n.suggested;
+      await S.db.collection("projects").doc(id).set({name:n.name.trim(), category:n.category, quarter:n.category===BOARD?n.quarter:"", status:OPEN.includes(n.status)?n.status:"Active", stage:n.category===EXTERNAL?n.stage:"",
+        description:n.description, stakeholders:n.stakeholders, corpDev:n.corp_dev, update:n.update, updateDate:date, links:[],
+        categorySource:changed?"person":"claude", categoryCorrected:changed, categorySuggested:n.suggested, categoryReason:n.category_reason, categoryCheck:!changed&&auto,
+        createdInMeeting:mid, createdAt:Date.now(), createdBy:S.meId||"", ...m},{quiet:true}); made++; }
+    for(const u of rv.u.filter(x=>x.take)){ const patch={update:u.update, updateDate:date, ...m};
+      if(OPEN.includes(u.status)) patch.status=u.status; if(u.stage) patch.stage=u.stage;
+      if(u.description) patch.description=u.description; if(u.corp_dev) patch.corpDev=u.corp_dev; if(u.stakeholders) patch.stakeholders=u.stakeholders;
+      try{ await S.db.collection("projects").doc(u.project_id).update(patch,{quiet:true}); made++; }catch(e){ if(!(e&&e.code==="not_found")) throw e; } }
+    for(const a of rv.a.filter(x=>x.take)){
+      try{ await S.db.collection("projects").doc(a.project_id).update({status:a.status==="Completed"?"Completed":"Dropped", closedAt:date, closedNote:a.reason||"", ...m},{quiet:true}); made++; }catch(e){ if(!(e&&e.code==="not_found")) throw e; } }
+    for(const t of rv.t.filter(x=>x.take&&String(x.text).trim())){
+      const pid=projById(t.project_ref)?t.project_ref:(nameToId[t.project_ref]||"");
+      await S.db.collection("todos").doc("t"+uid()).set({text:t.text.trim(), owner:String(t.owner||"").trim().toUpperCase(), due:t.due||"", projectId:pid, done:false, notes:"", quote:t.quote||"",
+        meetingId:mid, meetingDate:date, createdAt:Date.now(), createdBy:S.meId||"", ...m},{quiet:true}); made++; }
+    for(const d of rv.d.filter(x=>x.take)){ try{ await S.db.collection("todos").doc(d.todo_id).update({done:true, doneAt:date, ...m},{quiet:true}); made++; }catch(e){ if(!(e&&e.code==="not_found")) throw e; } }
+    await refetch("projects"); await refetch("todos");
+    await saveMeeting(date,{summary:rv.summary, source:"transcript"});
+  });
+  if(ok){ toast(`Saved ${made} change${made===1?"":"s"} and recorded the meeting`); S.changes=null; closeDrawer(); location.hash="#week"; }
+}
+
+/* ---------- workbook import (.xlsx) ---------- */
+function normCategory(s){ s=String(s||"").toLowerCase(); if(!s.trim()) return "";
+  if(/portfolio/.test(s)) return CATEGORIES[0]; if(/strategy refinement|organic/.test(s)) return CATEGORIES[1]; if(/external|m&a/.test(s)) return CATEGORIES[2];
+  if(/board/.test(s)) return CATEGORIES[3]; if(/other/.test(s)) return CATEGORIES[4]; return ""; }
+const cleanCell = v => String(v??"").replace(/\r/g,"").split("\n").map(l=>l.trimEnd()).join("\n").trim().replace(/^-\s*$/,"");
+function dateFrom(s){ s=String(s||""); let m=s.match(/(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})/); if(!m) return "";
+  let y=+m[3]; if(y<100) y+=2000; const mo=+m[1], d=+m[2]; if(mo<1||mo>12||d<1||d>31) return ""; return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
+function openStatusFrom(update){ const u=update.toLowerCase().replace(/[-\s]+/g," ").trim(); return (!u || /^(tbu|tbd|to be discussed)\b/.test(u) || /\bawaiting\b|\bwaiting (on|for)\b/.test(u)) ? "Pending" : "Active"; }
+function closedStatusFrom(update){ const u=update.toLowerCase(); return /kill|to be (removed|killed)|\bremoved?\b|\bdoa\b|\bpass\b|not selling|dropped/.test(u) ? "Dropped" : "Completed"; }
+function parseSheet(rows){
+  const hi=rows.findIndex(r=>r.some(c=>String(c).trim().toLowerCase()==="project")); if(hi<0) return null;
+  const H=rows[hi].map(c=>String(c).trim().toLowerCase());
+  const col=n=>H.findIndex(c=>c===n), pc=col("project"), dc=col("description"), sc=col("stakeholders"), cc=H.findIndex(c=>c.replace(/\s/g,"")==="corpdev");
+  let uc=H.findIndex(c=>/status/.test(c)); if(uc<0) uc=Math.max(pc,dc,sc,cc)+1;
+  const headDate=uc>=0?dateFrom(rows[hi][uc]):"";
+  const catCol=pc>0 && rows.slice(hi+1).some(r=>normCategory(r[pc-1])) ? pc-1 : -1;
+  let cat=""; const out=[];
+  rows.slice(hi+1).forEach((r,i)=>{ if(catCol>=0 && String(r[catCol]||"").trim()) cat=normCategory(r[catCol]);
+    const name=cleanCell(r[pc]); if(!name) return;
+    out.push({name, category:cat, description:dc>=0?cleanCell(r[dc]):"", stakeholders:sc>=0?cleanCell(r[sc]):"", corpDev:cc>=0?cleanCell(r[cc]).replace(/\s*\/\s*/g," / "):"", update:uc>=0?cleanCell(r[uc]):"", order:i}); });
+  return {rows:out, headDate, hasCategory:catCol>=0};
+}
+function workbookHTML(dr){
+  const p=dr.parsed;
+  return `${drHead("Set up","Import workbook")}
+  <form class="drawer-b" id="wbForm" novalidate>
+    <p style="margin:0">Choose your project list workbook (.xlsx). The <b>Current</b> tab becomes the project list (status Active, or Pending where the update is "TBU" or "awaiting"), <b>Old Projects</b> goes to the Archive (Dropped where the note says killed or removed, otherwise Completed), and each dated tab (e.g. 10.27.26) becomes a meeting snapshot. The file stays in your browser; only the rows are saved to the tracker.</p>
+    <label class="f">Workbook<input type="file" id="f_wbfile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+    ${dr.err?`<p class="err" role="alert">${esc(dr.err)}</p>`:""}
+    ${p?`<div class="tiles" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="tile"><b class="c-blue">${p.current.length}</b><span>Current projects</span><small>${p.current.filter(x=>x.status==="Pending").length} pending</small></div>
+      <div class="tile"><b class="c-teal">${p.old.length}</b><span>Old projects</span><small>${p.old.filter(x=>x.status==="Dropped").length} dropped</small></div><div class="tile"><b class="c-mag">${p.meetings.length}</b><span>Weekly snapshots</span><small>${p.meetings.map(m=>fmtDate(m.date)).join(", ")||"None found"}</small></div></div>
+      ${p.skipped?`<p class="t2" style="margin:0">${p.skipped} project${p.skipped===1?" is":"s are"} already in the tracker by name and will be skipped.</p>`:""}
+      <div class="tbl-wrap"><table><thead><tr><th>Category</th><th>Project</th><th>Status</th><th>Update</th></tr></thead><tbody>${p.current.map(x=>`<tr><td class="t2">${esc(CAT_SHORT[x.category]||NO_CAT)}</td><td>${esc(x.name)}</td><td>${statusPill(x.status)}</td><td><div class="prose clamp t2">${esc(x.update)}</div></td></tr>`).join("")}</tbody></table></div>`:""}
+  </form>
+  <div class="drawer-f"><span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="wb-save"${p&&(p.current.length||p.old.length||p.meetings.length)?"":" disabled"}>Import</button></div>`;
+}
+async function parseWorkbook(file){
+  await loadScript(XLSX_SRC,"Excel");
+  const wb=window.XLSX.read(await file.arrayBuffer(),{type:"array"});
+  const have=new Set(S.projects.map(p=>p.name.trim().toLowerCase()));
+  const res={current:[], old:[], meetings:[], skipped:0};
+  for(const sn of wb.SheetNames){
+    const rows=window.XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1, defval:"", raw:false});
+    const ps=parseSheet(rows); if(!ps||!ps.rows.length) continue;
+    const lower=sn.trim().toLowerCase(), sheetDate=dateFrom(sn.replace(/\s/g,""))||"";
+    if(/^current/.test(lower)){ res.currentDate=ps.headDate;
+      for(const r of ps.rows){ if(have.has(r.name.toLowerCase())){ res.skipped++; continue; } res.current.push({...r, status:openStatusFrom(r.update)}); }
+      if(ps.headDate) res.meetings.push({date:ps.headDate, rows:ps.rows.map(r=>({...r, status:openStatusFrom(r.update)})), fromCurrent:true}); }
+    else if(/old/.test(lower)){
+      for(const r of ps.rows){ if(have.has(r.name.toLowerCase()) && S.projects.some(p=>p.name.toLowerCase()===r.name.toLowerCase()&&!isOpen(p))){ res.skipped++; continue; } res.old.push({...r, status:closedStatusFrom(r.update)}); } }
+    else if(sheetDate||ps.headDate){ const date=ps.headDate||sheetDate; if(!res.meetings.some(m=>m.date===date)) res.meetings.push({date, rows:ps.rows.map(r=>({...r, status:openStatusFrom(r.update)}))}); }
+  }
+  res.meetings.sort((a,b)=>a.date.localeCompare(b.date));
+  return res;
+}
+async function importWorkbook(){
+  const p=S.drawer.parsed; if(!p) return; const m=meta(); let n=0;
+  const ok=await guard(async()=>{
+    const ids={};
+    for(const r of p.current){ const id="p"+uid(); ids[r.name.toLowerCase()]=id;
+      await S.db.collection("projects").doc(id).set({name:r.name, category:r.category, quarter:"", status:r.status, stage:"", description:r.description, stakeholders:r.stakeholders, corpDev:r.corpDev,
+        update:r.update, updateDate:p.currentDate||"", links:[], order:r.order, categorySource:r.category?"import":"", createdAt:Date.now(), createdBy:S.meId||"", ...m},{quiet:true}); n++; }
+    for(const r of p.old){
+      await S.db.collection("projects").doc("p"+uid()).set({name:r.name, category:r.category||"", quarter:"", status:r.status, stage:"", description:r.description, stakeholders:r.stakeholders, corpDev:r.corpDev,
+        update:r.update, updateDate:"", closedAt:"", links:[], order:r.order, categorySource:r.category?"import":"", createdAt:Date.now(), createdBy:S.meId||"", ...m},{quiet:true}); n++; }
+    for(const mt of p.meetings){ const id="m"+mt.date; if(S.meetings.some(x=>x.id===id)) continue;
+      await S.db.collection("meetings").doc(id).set({date:mt.date, title:"Weekly meeting", source:"import", summary:"",
+        snapshot:mt.rows.map(r=>({id:ids[r.name.toLowerCase()]||(S.projects.find(x=>x.name.toLowerCase()===r.name.toLowerCase())||{}).id||"", name:r.name, category:r.category, quarter:"", status:r.status, stage:"", description:r.description, stakeholders:r.stakeholders, corpDev:r.corpDev, update:r.update})),
+        createdAt:Date.now(), createdBy:S.meId||"", ...m},{quiet:true}); }
+    await Promise.all(TABLES.map(refetch));
+  });
+  if(ok){ toast(`Imported ${n} project${n===1?"":"s"} and ${p.meetings.length} weekly snapshot${p.meetings.length===1?"":"s"}`); S.changes=null; closeDrawer(); }
+}
+
+/* ---------- Excel export: same layout as the workbook ---------- */
+async function exportWorkbook(){
+  toast("Building the workbook…");
+  await loadScript(XLSX_SRC,"Excel"); const X=window.XLSX;
+  const lm=latestMeeting(); const label=lm?lm.date:TODAY(); const us=d=>{ const [y,mo,da]=d.split("-"); return `${+mo}/${+da}/${y}`; };
+  const cats=[...CATEGORIES,NO_CAT];
+  const grouped=list=>{ const out=[]; for(const c of cats){ const g=list.filter(p=>catOf(p)===c).sort((a,b)=>(a.order??1e9)-(b.order??1e9)||String(a.name).localeCompare(String(b.name))); if(!g.length && c===NO_CAT) continue;
+    if(!g.length){ out.push([c,"","","","","",""]); continue; } g.forEach((p,i)=>out.push([i?"":c, p.name+(p.quarter?` (${p.quarter})`:""), p.description||"", p.stakeholders||"", p.corpDev||"", p.status||"Active", p.update||""])); } return out; };
+  const sheet=(rows,widths)=>{ const ws=X.utils.aoa_to_sheet(rows); ws["!cols"]=widths.map(w=>({wch:w})); return ws; };
+  const wb=X.utils.book_new();
+  X.utils.book_append_sheet(wb, sheet([["","Project","Description","Stakeholders","Corp Dev","Status",`${us(label)} Update`], ...grouped(S.projects.filter(isOpen))],[28,30,50,22,16,10,60]), "Current");
+  X.utils.book_append_sheet(wb, sheet([["Owner","To-do","Project","Due","Done","From meeting"], ...sortTodos([...S.todos]).map(t=>[t.owner||"", t.text, (projById(t.projectId)||{}).name||"", t.due||"", t.done?"Yes":"", t.meetingDate||""])],[8,60,30,12,6,14]), "To-dos");
+  X.utils.book_append_sheet(wb, sheet([["Project","Description","Stakeholders","Corp Dev","Status","Last update","Closed"], ...S.projects.filter(p=>!isOpen(p)).sort((a,b)=>String(b.closedAt||"").localeCompare(String(a.closedAt||""))).map(p=>[p.name,p.description||"",p.stakeholders||"",p.corpDev||"",p.status,p.update||"",p.closedAt||""])],[30,50,22,16,10,60,12]), "Old Projects");
+  const used=new Set(["Current","To-dos","Old Projects"]);
+  for(const mt of [...S.meetings].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,26)){
+    const [y,mo,da]=mt.date.split("-"); let nm=`${mo}.${da}.${y.slice(2)}`; if(used.has(nm)) continue; used.add(nm);
+    X.utils.book_append_sheet(wb, sheet([["","Project","Description","Stakeholders","Corp Dev","Status",`${us(mt.date)} Update`], ...grouped((mt.snapshot||[]).map(s=>({...s})))],[28,30,50,22,16,10,60]), nm);
+  }
+  X.writeFile(wb, `Corp_Dev_Project_List_As_of_${label.slice(5,7)}.${label.slice(8,10)}.${label.slice(2,4)}.xlsx`);
+}
+
+/* ---------- events ---------- */
+function setMenu(open){ S.menuOpen=!!open; const m=document.getElementById("whoMenu"), d=document.getElementById("whoDot"); if(!m||!d) return; m.hidden=!S.menuOpen; d.setAttribute("aria-expanded", String(S.menuOpen)); if(S.menuOpen) m.querySelector("button")?.focus(); }
+document.addEventListener("click", async e=>{
+  if(S.menuOpen && !e.target.closest("#whoMenu,#whoDot")) setMenu(false);
+  const t=e.target.closest("[data-act]"); if(!t) return; const a=t.dataset.act, id=t.dataset.id;
+  if(t.closest("#whoMenu")) setMenu(false);
+  if(t.tagName==="TR" && e.target.closest("button,a")) return;
+  if(t.tagName==="INPUT" && a!=="todo-done") return;
+  switch(a){
+    case "close": closeDrawer(); break;
+    case "who-menu": setMenu(!S.menuOpen); break;
+    case "signout": signOut(); break;
+    case "change-pw": S.drawer={kind:"password"}; renderDrawer(); break;
+    case "save-pw": t.disabled=true; await savePassword(); t.disabled=false; break;
+    case "settings": S.drawer={kind:"settings"}; renderDrawer(); break;
+    case "save-settings": { const on=!!document.getElementById("f_auto")?.checked;
+      if(await guard(async()=>{ const {error}=await S.sb.from("settings").upsert({id:"claude", doc:{...(S.settings.claude||{}), autoCategory:on}}); if(error) throw error; await loadSettings(); }, "Settings saved")) closeDrawer(); break; }
+    case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "af": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
+    case "open-project": goRecord("project",id); break;
+    case "open-project-snap": if(id&&projById(id)){ S.drawer=null; goRecord("project",id); } break;
+    case "open-todo": goRecord("todo",id); break;
+    case "open-meeting": goRecord("meeting",id); break;
+    case "new-project": S.drawer={kind:"project",id:null,links:[]}; renderDrawer(); break;
+    case "save-project": t.disabled=true; await saveRecord("project"); t.disabled=false; break;
+    case "save-todo": t.disabled=true; await saveRecord("todo"); t.disabled=false; break;
+    case "todo-done": await toggleTodo(id, t.checked); break;
+    case "add-ptodo": { const dr=S.drawer; if(!dr) return; t.disabled=true; if(await addTodo({text:val("pt_text"), owner:val("pt_owner"), due:val("pt_due"), projectId:dr.id})){ captureForm(); dr.rendered=false; renderDrawer(); restoreForm(); } t.disabled=false; break; }
+    case "cat-ok": { const dr=S.drawer; if(await guard(()=>S.db.collection("projects").doc(dr.id).update({categoryCheck:false, ...meta()}),"Category confirmed")){ dr.orig.categoryCheck=false; rerenderDrawer(); } break; }
+    case "add-link": readLinks(); S.drawer.links.push({label:"",url:""}); document.getElementById("linkRows").innerHTML=linkRowsHTML(S.drawer.links); break;
+    case "rm-link": readLinks(); S.drawer.links.splice(+t.dataset.i,1); document.getElementById("linkRows").innerHTML=linkRowsHTML(S.drawer.links); break;
+    case "del-ask": S.drawer.confirmDelete=true; rerenderDrawer(); break;
+    case "del-no": S.drawer.confirmDelete=false; rerenderDrawer(); break;
+    case "del-yes": case "del-meeting-yes": t.disabled=true; await deleteRecord(); break;
+    case "cf-pick": { const c=S.drawer&&S.drawer.conflicts&&S.drawer.conflicts[+t.dataset.i]; if(c){ c.choice=t.dataset.c; renderDrAlert(); } break; }
+    case "gone-recreate": t.disabled=true; await recreateRecord(); t.disabled=false; break;
+    case "import-tr": S.drawer={kind:"transcript", step:"input", date:TODAY()}; renderDrawer(); break;
+    case "tr-read": t.disabled=true; await readWithClaude(); break;
+    case "tr-cancel": if(S.drawer&&S.drawer.ctrl) S.drawer.ctrl.abort(); break;
+    case "tr-back": S.drawer.step="input"; S.drawer.rendered=false; renderDrawer(); break;
+    case "tr-save": t.disabled=true; await applyReview(); if(t.isConnected) t.disabled=false; break;
+    case "import-wb": S.drawer={kind:"workbook"}; renderDrawer(); break;
+    case "wb-save": t.disabled=true; await importWorkbook(); if(t.isConnected) t.disabled=false; break;
+    case "snapshot": S.drawer={kind:"snapshot"}; renderDrawer(); break;
+    case "snap-save": { const d=val("f_sdate"); if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ toast("Choose the meeting date."); return; } t.disabled=true;
+      if(await guard(()=>saveMeeting(d,{summary:val("f_ssum"), source:"manual"}).then(()=>refetch("meetings")), "Snapshot saved")) closeDrawer(); else t.disabled=false; break; }
+    case "export-xlsx": t.disabled=true; try{ await exportWorkbook(); }catch(err){ toast("Couldn't build the workbook: "+((err&&err.message)||"unknown error")); } t.disabled=false; break;
+    case "print": window.print(); break;
+  }
+});
+document.addEventListener("keydown", e=>{
+  if(e.key==="Tab" && S.drawer){ const d=document.querySelector("#drawerRoot .drawer");
+    if(d){ const f=[...d.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(x=>x.offsetParent!==null);
+      if(f.length){ const first=f[0], last=f[f.length-1];
+        if(!d.contains(document.activeElement)){ e.preventDefault(); (e.shiftKey?last:first).focus(); }
+        else if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); } } } }
+  if(e.key==="Escape" && S.menuOpen){ setMenu(false); document.getElementById("whoDot").focus(); return; }
+  if(e.key==="Escape" && S.drawer && S.drawer.step!=="busy") closeDrawer();
+  if(e.key==="Enter" && e.target.matches("tr.click, li.click, .todo .tx")) e.target.click();
+});
+document.addEventListener("submit", async e=>{ e.preventDefault();
+  if(e.target.id==="loginForm"){ doLogin(); return; }
+  if(e.target.id==="pwForm"){ savePassword(); return; }
+  if(e.target.id==="addTodoForm"){ if(await addTodo({text:val("nt_text"), owner:val("nt_owner"), due:val("nt_due")})){ const x=document.getElementById("nt_text"); if(x){ x.value=""; x.focus(); } } }
+});
+document.addEventListener("input", e=>{
+  const id=e.target.id;
+  if(id==="q"||id==="aq"||id==="tq"){ S[id]=e.target.value; render(); return; }
+  if(id==="f_ttext"){ const i=document.getElementById("trInfo"); if(i) i.textContent=e.target.value.trim()?`${e.target.value.trim().length.toLocaleString("en-US")} characters`:""; return; }
+  const rvp=e.target.dataset&&e.target.dataset.rv; if(rvp&&S.drawer&&S.drawer.rv&&e.target.type!=="checkbox"){ const [k,i,f]=rvp.split("."); S.drawer.rv[k][+i][f]=e.target.value; }
+});
+document.addEventListener("change", async e=>{
+  const id=e.target.id, dr=S.drawer;
+  if(id==="f_category"){ const c=e.target.value; const q=document.getElementById("quarterWrap"), s=document.getElementById("stageWrap"); if(q) q.hidden=c!==BOARD; if(s) s.hidden=c!==EXTERNAL; return; }
+  if(id==="f_tfile" && e.target.files[0]){ try{ const txt=await readTranscriptFile(e.target.files[0]); const ta=document.getElementById("f_ttext"); ta.value=txt; ta.dispatchEvent(new Event("input",{bubbles:true})); toast("Transcript loaded. Check the date, then Read with Claude."); }catch(err){ toast("Couldn't read that file: "+((err&&err.message)||err)); } return; }
+  if(id==="f_wbfile" && e.target.files[0]){ try{ dr.parsed=await parseWorkbook(e.target.files[0]); dr.err=dr.parsed.current.length||dr.parsed.old.length||dr.parsed.meetings.length?"":"No project rows found. The import looks for a header row with Project, Description, Stakeholders and Corp Dev."; }catch(err){ dr.parsed=null; dr.err="Couldn't read that workbook: "+((err&&err.message)||err); } dr.rendered=false; renderDrawer(); return; }
+  const rvp=e.target.dataset&&e.target.dataset.rv;
+  if(rvp&&dr&&dr.rv){ const [k,i,f]=rvp.split("."); dr.rv[k][+i][f]=e.target.type==="checkbox"?e.target.checked:e.target.value;
+    if(f==="take"||f==="category"||(k==="n"&&f==="name")){ const b=document.getElementById("rvBody"), top=b?b.scrollTop:0; dr.rendered=false; renderDrawer(); const nb=document.getElementById("rvBody"); if(nb) nb.scrollTop=top; document.querySelector(`[data-rv="${CSS.escape(rvp)}"]`)?.focus(); } }
+});
+
+/* ---------- data: Supabase tables (id text, doc jsonb) ---------- */
+async function refetch(table){
+  const {data, error}=await S.sb.from(table).select("id,doc,updated_at,updated_by");
+  if(error){ if(!S.loaded[table]) toast("Couldn't load the tracker: "+error.message); return; }
+  S[table]=(data||[]).map(r=>({...(r.doc||{}), id:r.id, _v:r.updated_at, _by:r.updated_by}));
+  if(table==="projects") S.projects.forEach(p=>{ if(!STATUSES.includes(p.status)) p.status="Active"; });
+  S.loaded[table]=true; if(TABLES.every(t=>S.loaded[t])) clearTimeout(startData.timer);
+  if(table==="projects" && S.changes && !S.changes.loading) S.changes=null;
+  if(S.drawer && S.drawer.kind==="meeting") S.drawer.rendered=false;
+  render();
+  if(S.pendingRoute && S.loaded[S.pendingRoute.kind+"s"]) openRoute(S.pendingRoute);
+}
+const refetchSoon = (()=>{ const t={}; return table=>{ clearTimeout(t[table]); t[table]=setTimeout(()=>refetch(table),300); }; })();
+async function loadProfiles(){ const {data}=await S.sb.from("profiles").select("id,display_name,username,initials"); (data||[]).forEach(p=>{ S.profiles[p.id]={name:p.display_name, username:p.username||"", initials:p.initials||""}; }); }
+async function loadSettings(){ try{ const {data,error}=await S.sb.from("settings").select("id,doc"); if(!error) S.settings=Object.fromEntries((data||[]).map(r=>[r.id,r.doc||{}])); }catch{} }
+function startData(){
+  if(S.started) return; S.started=true;
+  startData.timer=setTimeout(()=>{ S.stale=true; render(); }, 10000);
+  loadProfiles().then(render); loadSettings();
+  TABLES.forEach(refetch);
+  let ch=S.sb.channel("corpdev-tracker");
+  TABLES.forEach(t=>{ ch=ch.on("postgres_changes",{event:"*",schema:"public",table:t},()=>refetchSoon(t)); });
+  S.channel=ch.subscribe();
+}
+function stopData(){ if(S.channel){ S.sb.removeChannel(S.channel); S.channel=null; } S.hist={}; S.changes=null; S.started=false; TABLES.forEach(t=>{ S[t]=[]; S.loaded[t]=false; }); }
+
+/* ---------- auth: Supabase email/password; usernames map to <username>@<usernameDomain> ---------- */
+function toEmail(u){ u=u.trim().toLowerCase(); return u.includes("@") ? u : u+"@"+(CFG.usernameDomain||"corpdev-tracker.local"); }
+async function onSignedIn(session){
+  S.meId=session.user.id;
+  const {data, error}=await S.sb.from("profiles").select("username,display_name,initials").eq("id", session.user.id).maybeSingle();
+  if(error || !data){ await S.sb.auth.signOut(); S.session=null; S.loginErr="This login isn't set up for the tracker yet. Ask the tracker owner."; render(); return; }
+  S.session={username:data.username, name:data.display_name||data.username, initials:(data.initials||"").toUpperCase()};
+  const dot=document.getElementById("whoDot"); dot.hidden=false; dot.textContent=S.session.initials||S.session.name.trim().split(/\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase(); dot.setAttribute("aria-label",`Account: ${S.session.name}`);
+  startData(); route();
+}
+async function doLogin(){
+  if(S.loginBusy) return;
+  const u=val("li_user"), pw=document.getElementById("li_pw")?.value||"";
+  if(!u||!pw){ S.loginErr="Enter your username and password."; render(); return; }
+  S.loginBusy=true; S.loginErr=""; render();
+  const {data, error}=await S.sb.auth.signInWithPassword({email:toEmail(u), password:pw});
+  S.loginBusy=false;
+  if(error || !data.session){
+    const m=(error&&error.message)||"No session returned";
+    S.loginErr = /rate|too many/i.test(m) ? "Too many attempts. Wait a few minutes and try again."
+      : (error && (error.code==="invalid_credentials" || /invalid login credentials/i.test(m))) ? "That username and password don't match. Check them, or ask the tracker owner to reset your password."
+      : "Sign-in failed: "+m+". The site's Supabase settings may be wrong; tell the tracker owner.";
+    render(); const f=document.getElementById("li_pw"); if(f){ f.value=""; f.focus(); } return;
+  }
+  await onSignedIn(data.session);
+}
+async function signOut(){ try{ await S.sb.auth.signOut(); }catch{} stopData(); S.session=null; S.drawer=null; document.getElementById("whoDot").hidden=true; history.replaceState(null,"",location.pathname); render(); }
+function loginHTML(){
+  const wrap = inner => `<div class="login" role="region" aria-label="Sign in">${inner}</div>`;
+  if(S.configMissing) return wrap(`<h2>Not connected yet</h2><p>This site has no database settings. Add the SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY repository variables and redeploy (see the README).</p>`);
+  if(!S.authChecked) return wrap(`<h2>Corp Dev tracker</h2><p>Loading…</p>`);
+  return wrap(`<div class="kicker">Corporate development</div><h2>Sign in to the project tracker</h2>
+    <form id="loginForm" style="display:flex;flex-direction:column;gap:12px" novalidate>
+      <label class="f">Username<input type="text" id="li_user" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+      <label class="f">Password<input type="password" id="li_pw" autocomplete="current-password"></label>
+      ${S.loginErr?`<p class="err" role="alert">${esc(S.loginErr)}</p>`:""}
+      <div class="inline"><button class="btn primary" ${S.loginBusy?"disabled":""}>${S.loginBusy?"Signing in…":"Sign in"}</button></div>
+    </form><p class="source">Forgot your password? Ask the tracker owner to reset it.</p>`);
+}
+async function boot(){
+  route();
+  if(!CFG.supabaseUrl || !CFG.supabaseAnonKey || !window.supabase){ S.configMissing=true; render(); return; }
+  S.sb=window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey);
+  S.db=makeDb(S.sb);
+  const {data:{session}}=await S.sb.auth.getSession();
+  S.authChecked=true;
+  if(session) await onSignedIn(session); else render();
+  S.sb.auth.onAuthStateChange(ev=>{ if(ev==="SIGNED_OUT" && S.session){ stopData(); S.session=null; S.loginErr="You were signed out. Sign in again."; render(); } });
+}
+boot();
+</script>
+</body>
+</html>
