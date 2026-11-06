@@ -69,6 +69,12 @@ const raw = {
     { person: "", about: "", owner: "ZT", project_ref: "", due: "", quote: "" },
     { person: "C. Person", about: "Check when he's back in New York", owner: "ZT", project_ref: "nope", due: "soon", quote: "" },
   ],
+  developments: [
+    { title: "Casualty rates softening", detail: "Brokers report rate decreases.", topic: "Industry trends", quote: "" },
+    { title: "casualty rates softening", detail: "dupe", topic: "Industry trends", quote: "" },
+    { title: "Peer results", detail: "", topic: "Gossip", quote: "" },
+    { title: "", detail: "", topic: "Other", quote: "" },
+  ],
   todos_done: [{ todo_id: "t1", reason: "" }, { todo_id: "t9", reason: "" }],
 };
 const c = cleanProposal(raw, input);
@@ -84,7 +90,9 @@ ok("unknown project ref and bad date cleared", c.todos[1].project_ref === "" && 
 ok("done list keeps known to-dos only", c.todos_done.length === 1 && c.todos_done[0].todo_id === "t1");
 ok("reminders: duplicates and empty ones dropped", c.reminders.length === 2 && c.reminders[0].person === "B. Sample" && c.reminders[0].project_ref === "Kestrel", c.reminders);
 ok("reminders: unknown project and bad date cleared", c.reminders[1].project_ref === "" && c.reminders[1].due === "");
+ok("developments: duplicates and empty ones dropped, unknown topic read as Other", c.developments.length === 2 && c.developments[1].topic === "Other", c.developments);
+ok("system prompt explains developments", /developments: key developments discussed/.test(SYSTEM));
 ok("system prompt explains reminders", /reminders: people to follow up with/.test(SYSTEM));
-ok("garbage answer gives empty proposal", JSON.stringify(cleanProposal(null, input)) === JSON.stringify({ summary: "", project_updates: [], new_projects: [], archive: [], todos: [], reminders: [], todos_done: [] }));
+ok("garbage answer gives empty proposal", JSON.stringify(cleanProposal(null, input)) === JSON.stringify({ summary: "", project_updates: [], new_projects: [], archive: [], todos: [], reminders: [], developments: [], todos_done: [] }));
 
 console.log(`${pass} passed, ${fail} failed`); if (fail) Deno.exit(1);

@@ -89,6 +89,17 @@ footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-bl
 
 /* To-do rows */
 .todos{list-style:none;margin:0;padding:0}
+/* Key developments */
+.devs{display:flex;flex-direction:column;gap:8px}
+.dev{border-left:4px solid var(--lblue);background:var(--alt);padding:10px 14px;cursor:pointer}
+.dev:hover{background:var(--tile)}
+.dev .dh{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.dev .dh b{font-size:14px}
+.dev p{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}
+.topic{display:inline-block;font-size:10px;font-weight:bold;letter-spacing:.05em;text-transform:uppercase;color:var(--blue);border:1px solid currentColor;padding:0 5px;white-space:nowrap}
+.adddev{display:grid;grid-template-columns:minmax(0,1fr) 180px auto;gap:6px;align-items:start}
+.adddev textarea{grid-column:1/-1;min-height:44px}
+@media (max-width:700px){.adddev{grid-template-columns:1fr}}
 /* Dashboard: project table with the reminders panel beside it */
 .weekgrid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
 .weekgrid>*{min-width:0}
@@ -303,6 +314,7 @@ label.chk input{margin-top:3px}
       <a href="#projects" data-view="projects">Projects</a>
       <a href="#todos" data-view="todos">To-dos<span class="ntag" id="tagTodos"></span></a>
       <a href="#archive" data-view="archive">Archive</a>
+      <a href="#developments" data-view="developments">Key developments</a>
       <a href="#meetings" data-view="meetings">Meetings</a>
     </nav>
   </div>
@@ -326,11 +338,12 @@ const STATUS_HELP = {Active:"Ongoing",Pending:"No update, or waiting on someone 
 const STAGES = ["Screening","NDA signed","LOI","Diligence","Closed","On hold","Dead"];   // deal stage: External Growth projects only
 const EXTERNAL = "External Growth Initiatives", BOARD = "Quarterly Board Updates";
 const PROJECT_FIELDS = ["name","category","quarter","status","stage","description","stakeholders","corpDev","update","links"];
-const TODO_FIELDS = ["person","text","owner","projectId","due","done","notes"];
+const TODO_FIELDS = ["person","text","topic","owner","projectId","due","done","notes"];
 const FIELD_LABELS = {name:"Project",category:"Category",quarter:"Quarter",status:"Status",stage:"Deal stage",description:"Description",stakeholders:"Stakeholders",corpDev:"Corp Dev",update:"Weekly update",links:"Links",
-  person:"Follow up with",text:"To-do",owner:"Owner",projectId:"Project",due:"Due",done:"Done",notes:"Notes",closedAt:"Closed",updateDate:"Update date"};
+  person:"Follow up with",text:"To-do",topic:"Topic",owner:"Owner",projectId:"Project",due:"Due",done:"Done",notes:"Notes",closedAt:"Closed",updateDate:"Update date"};
 const LONG_FIELDS = ["description","update","notes"];
 const QUIET_DAYS = 21;
+const DEV_TOPICS = ["Industry trends", "Company news", "Market and deals", "Regulation", "Ascot", "Other"];
 const DAY_MS = 86400000;
 const XLSX_SRC = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
 const JSZIP_SRC = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
@@ -341,9 +354,9 @@ if(CFG.supabaseUrl) CFG.supabaseUrl = String(CFG.supabaseUrl).trim().replace(/\/
 const TABLES = ["projects","todos","meetings"];
 const S = {
   view:"week", sb:null, db:null, meId:null, session:null, authChecked:false, started:false, channel:null, loginErr:"", loginBusy:false,
-  projects:[], todos:[], reminders:[], meetings:[], loaded:{projects:false,todos:false,meetings:false}, stale:false, configMissing:false,
+  projects:[], todos:[], reminders:[], developments:[], meetings:[], loaded:{projects:false,todos:false,meetings:false}, stale:false, configMissing:false,
   profiles:{}, settings:{}, hist:{}, changes:null,
-  q:"", pf:"open", pcat:"all", ppl:"all", tf:"open", tpl:"all", aq:"", drawer:null
+  q:"", pf:"open", pcat:"all", ppl:"all", tf:"open", tpl:"all", aq:"", dq:"", dtopic:"all", drawer:null
 };
 
 /* ---------- helpers ---------- */
@@ -365,6 +378,7 @@ const isOpen = p => OPEN.includes(p.status||"Active");
 const catOf = p => CATEGORIES.includes(p.category) ? p.category : NO_CAT;
 const projById = id => S.projects.find(p=>p.id===id);
 const allTodos = () => [...S.todos, ...S.reminders];
+const allRows = () => [...S.todos, ...S.reminders, ...S.developments];
 const initialsList = s => String(s||"").toUpperCase().split(/[\/,&;]|\s+and\s+|\s+/).map(x=>x.trim()).filter(Boolean);
 function myInitials(){ return ((S.session && S.session.initials) || "").toUpperCase(); }
 function statusPill(st){ st=STATUSES.includes(st)?st:"Active"; return `<span class="pill s-${st}" title="${esc(STATUS_HELP[st])}">${st}</span>`; }
@@ -387,7 +401,7 @@ function todoOverdue(t){ const n=daysUntil(t.due); return !t.done && n!=null && 
 function sortTodos(list){ return list.sort((a,b)=>(a.done-b.done) || String(a.due||"9999").localeCompare(String(b.due||"9999")) || String(a.owner||"").localeCompare(String(b.owner||"")) || (a.createdAt||0)-(b.createdAt||0)); }
 
 /* ---------- routing ---------- */
-const VIEWS = ["week","projects","todos","archive","meetings"];
+const VIEWS = ["week","projects","todos","archive","developments","meetings"];
 function parseHash(){ let h=(location.hash||"").replace(/^#/,""); try{ h=decodeURIComponent(h); }catch{} const m=h.match(/^(project|todo|meeting)\/(.+)$/); return m?{kind:m[1],id:m[2]}:{view:h}; }
 function route(){
   const r=parseHash();
@@ -401,7 +415,7 @@ function openRoute(r){
   if(!S.session || !S.loaded[tbl]){ S.pendingRoute=r; return; }
   S.pendingRoute=null;
   const dr=S.drawer; if(dr && dr.id===r.id && dr.kind===r.kind) return;
-  const rec=(tbl==="todos"?allTodos():S[tbl]).find(x=>x.id===r.id);
+  const rec=(tbl==="todos"?allRows():S[tbl]).find(x=>x.id===r.id);
   if(!rec){ toast(`That ${r.kind==="todo"?"to-do":r.kind} isn't in the tracker. It may have been deleted.`); history.replaceState(null,"","#"+S.view); S.pushed=false; return; }
   if(r.kind==="meeting"){ S.drawer={kind:"meeting",id:r.id}; renderDrawer(); }
   else openEditor(r.kind, r.id);
@@ -419,10 +433,10 @@ function render(){
   document.querySelectorAll("nav.tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.view===S.view ? "page" : "false"));
   const mine=S.todos.filter(t=>!t.done && myInitials() && initialsList(t.owner).includes(myInitials())).length;
   document.getElementById("tagTodos").textContent = mine ? `${mine} yours` : "";
-  const html = TABLES.some(t=>!S.loaded[t]) ? "" : S.view==="projects" ? renderProjects() : S.view==="todos" ? renderTodos() : S.view==="archive" ? renderArchive() : S.view==="meetings" ? renderMeetings() : renderWeek();
+  const html = TABLES.some(t=>!S.loaded[t]) ? "" : S.view==="projects" ? renderProjects() : S.view==="todos" ? renderTodos() : S.view==="archive" ? renderArchive() : S.view==="developments" ? renderDevelopments() : S.view==="meetings" ? renderMeetings() : renderWeek();
   const ae=document.activeElement, aid=ae&&ae.id, pos=ae&&ae.selectionStart;
   v.innerHTML = statusBanner() + html;
-  if(aid){ const e=document.getElementById(aid); if(e && e!==document.activeElement && /^(q|aq|tq)$/.test(aid)){ e.focus(); try{ e.setSelectionRange(pos,pos); }catch{} } }
+  if(aid){ const e=document.getElementById(aid); if(e && e!==document.activeElement && /^(q|aq|tq|dq)$/.test(aid)){ e.focus(); try{ e.setSelectionRange(pos,pos); }catch{} } }
   renderDrawer();
 }
 function statusBanner(){
@@ -576,9 +590,55 @@ function renderMeetings(){
   return `
   <section class="pagehead"><div><h2 class="action-title">Meetings</h2><p class="sub">Each weekly meeting keeps a snapshot of the project list as it stood, like the dated tabs in the workbook.</p></div>
     <div class="headacts"><button class="btn accent" data-act="import-tr">Import transcript</button><button class="btn" data-act="snapshot">Save a snapshot without a transcript</button></div></section>
-  ${ms.length?`<ul class="mlist">${ms.map(m=>{ const n=S.todos.filter(t=>t.meetingId===m.id).length;
-    return `<li class="click" data-act="open-meeting" data-id="${esc(m.id)}" tabindex="0"><span class="d">${esc(fmtDate(m.date))}</span><div><p><b>${esc(m.title||"Weekly meeting")}</b></p>${m.summary?`<p class="meta">${esc(m.summary)}</p>`:""}<p class="meta">${(m.snapshot||[]).length} projects in the snapshot${n?` · ${n} to-do${n===1?"":"s"}`:""}${m.source==="import"?" · imported from the workbook":m.source==="manual"?" · saved by hand":""}</p></div></li>`; }).join("")}</ul>`
+  ${ms.length?`<ul class="mlist">${ms.map(m=>{ const n=S.todos.filter(t=>t.meetingId===m.id).length, k=S.developments.filter(t=>t.meetingId===m.id).length;
+    return `<li class="click" data-act="open-meeting" data-id="${esc(m.id)}" tabindex="0"><span class="d">${esc(fmtDate(m.date))}</span><div><p><b>${esc(m.title||"Weekly meeting")}</b></p>${m.summary?`<p class="meta">${esc(m.summary)}</p>`:""}<p class="meta">${(m.snapshot||[]).length} projects in the snapshot${n?` · ${n} to-do${n===1?"":"s"}`:""}${k?` · ${k} key development${k===1?"":"s"}`:""}${m.source==="import"?" · imported from the workbook":m.source==="manual"?" · saved by hand":""}</p></div></li>`; }).join("")}</ul>`
     :`<div class="empty"><p>No meetings yet. Import a transcript after your next weekly meeting, or import the workbook to bring in past weeks.</p></div>`}`;
+}
+
+/* Key developments: things discussed that aren't about a project on the list (to-dos with kind "development") */
+function devCardsHTML(list){
+  return `<div class="devs">${list.map(d=>`<div class="dev" data-act="open-todo" data-id="${esc(d.id)}" tabindex="0"><div class="dh"><span class="topic">${esc(d.topic||"Other")}</span><b>${esc(d.text||"")}</b></div>${d.notes?`<p>${esc(d.notes)}</p>`:""}</div>`).join("")}</div>`;
+}
+const devDate = d => d.meetingDate || (d.createdAt ? iso(new Date(d.createdAt)) : "");
+function renderDevelopments(){
+  const q=S.dq.trim().toLowerCase();
+  const base=S.developments.filter(d=>!q||[d.text,d.notes,d.topic].join(" ").toLowerCase().includes(q));
+  const rows=base.filter(d=>S.dtopic==="all"||(d.topic||"Other")===S.dtopic).sort((a,b)=>devDate(b).localeCompare(devDate(a))||(b.createdAt||0)-(a.createdAt||0));
+  const chip=(v,l,n)=>`<button type="button" class="fchip" data-act="dtopic" data-v="${esc(v)}" aria-pressed="${S.dtopic===v}">${esc(l)}<b>${n}</b></button>`;
+  const groups=[]; for(const d of rows){ const k=devDate(d); const g=groups[groups.length-1]; if(g&&g.k===k) g.list.push(d); else groups.push({k, list:[d]}); }
+  const lm=latestMeeting();
+  return `
+  <section class="pagehead"><div><h2 class="action-title">Key developments</h2><p class="sub">What came up in the meetings that isn't about a project on the list: industry trends, news about other companies, market moves, regulation. Claude picks these out of each transcript; you can add them by hand too.</p></div>
+    <div class="headacts"><button class="btn accent" data-act="import-tr">Import transcript</button></div></section>
+  <form class="adddev" id="addDevForm" aria-label="Add a key development"><input type="text" id="nd_text" placeholder="Headline, e.g. Casualty rates starting to soften" aria-label="Headline">${sel("nd_topic",DEV_TOPICS,"Industry trends")}<button class="btn primary">Add</button>
+    <textarea id="nd_notes" placeholder="Detail (optional): what was said and why it matters" aria-label="Detail"></textarea></form>
+  <section class="toolbar"><div class="grow"><input type="search" id="dq" placeholder="Search key developments" aria-label="Search key developments" value="${esc(S.dq)}"></div></section>
+  <div class="fchips" role="group" aria-label="Topic">${chip("all","All topics",base.length)}${DEV_TOPICS.map(t=>chip(t,t,base.filter(d=>(d.topic||"Other")===t).length)).join("")}</div>
+  ${groups.length?groups.map(g=>`<section><h3 class="sec">${g.k?`${S.meetings.some(m=>m.date===g.k)?(lm&&g.k===lm.date?"This week: meeting on ":"Meeting on "):(lm&&g.k===lm.date?"This week: ":"")}${esc(fmtDate(g.k))}`:"Undated"} <span class="n">${g.list.length}</span></h3>${devCardsHTML(g.list)}</section>`).join("")
+    :`<div class="empty"><p>${S.developments.length?"Nothing matches.":"No key developments yet. They'll appear here after you import a meeting transcript, or add one above."}</p></div>`}
+  <p class="source">${rows.length} key development${rows.length===1?"":"s"} shown.</p>`;
+}
+function developmentFormHTML(dr,t){
+  return `${drHead("Key development", esc(t.text||"Key development"), dr.id?savedLine(t):"")}
+  <form class="drawer-b" id="todoForm" novalidate>
+    <div id="drAlert" role="alert"></div>
+    <div class="fgrid">
+      <label class="f full">Headline<input type="text" id="f_text" value="${esc(t.text||"")}"></label>
+      <label class="f">Topic${sel("f_topic",DEV_TOPICS,t.topic||"Other")}</label>
+      <label class="f full">Detail<textarea id="f_notes" rows="5">${esc(t.notes||"")}</textarea></label>
+    </div>
+    ${t.quote?`<p class="source">From the transcript: "${esc(t.quote)}"</p>`:""}
+    ${t.meetingDate?`<p class="t2" style="margin:0">From the meeting on ${esc(fmtDate(t.meetingDate))}.</p>`:""}
+    <div><h3 class="sec">History</h3><ul class="mlist hist" id="histList"></ul></div>
+  </form>
+  <div class="drawer-f">${dr.confirmDelete?`<span class="over">Delete this key development?</span><button class="btn danger sm" data-act="del-yes">Delete</button><button class="btn sm" data-act="del-no">Keep</button>`:`<button class="btn danger" data-act="del-ask">Delete</button>`}
+    <span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="save-todo">Save changes</button></div>`;
+}
+async function addDevelopment({text, topic, notes}){
+  text=String(text||"").trim(); notes=String(notes||"").trim(); if(!text){ toast("Write a headline first."); return false; }
+  const lm=latestMeeting();
+  return guard(()=>S.db.collection("todos").doc("k"+uid()).set({kind:"development", text, topic:DEV_TOPICS.includes(topic)?topic:"Other", notes, done:false,
+    meetingId:"", meetingDate:lm&&lm.date>=addDays(TODAY(),-7)?lm.date:TODAY(), createdAt:Date.now(), createdBy:S.meId||"", ...meta()}), "Key development added");
 }
 
 /* What changed: change history for the last 7 days */
@@ -682,7 +742,8 @@ function projectFormValues(){
 
 /* To-do editor */
 function todoFormHTML(dr){
-  const isNew=!dr.id; const t = isNew ? (dr.seed||{}) : (dr.orig||allTodos().find(x=>x.id===dr.id)||{}); const rem=t.kind==="reminder";
+  const isNew=!dr.id; const t = isNew ? (dr.seed||{}) : (dr.orig||allRows().find(x=>x.id===dr.id)||{}); const rem=t.kind==="reminder", dev=t.kind==="development";
+  if(dev) return developmentFormHTML(dr,t);
   const projs=[...S.projects].sort((a,b)=>(isOpen(b)-isOpen(a))||String(a.name).localeCompare(String(b.name)));
   return `${drHead(rem?"Reminder":isNew?"New to-do":"To-do", esc(rem?`Follow up with ${t.person||"someone"}`:t.text||"New to-do"), isNew?"":savedLine(t))}
   <form class="drawer-b" id="todoForm" novalidate>
@@ -703,7 +764,8 @@ function todoFormHTML(dr){
   <div class="drawer-f">${isNew?"":(dr.confirmDelete?`<span class="over">Delete this to-do?</span><button class="btn danger sm" data-act="del-yes">Delete</button><button class="btn sm" data-act="del-no">Keep</button>`:`<button class="btn danger" data-act="del-ask">Delete</button>`)}
     <span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="save-todo">${isNew?"Add to-do":"Save changes"}</button></div>`;
 }
-function todoFormValues(){ return {...(document.getElementById("f_person")?{person:val("f_person")}:{}), text:val("f_text"), owner:val("f_owner").toUpperCase(), due:val("f_due"), projectId:val("f_projectId"), done:!!document.getElementById("f_done")?.checked, notes:val("f_notes")}; }
+function todoFormValues(){ if(document.getElementById("f_topic")) return {text:val("f_text"), topic:val("f_topic"), notes:val("f_notes")};
+  return {...(document.getElementById("f_person")?{person:val("f_person")}:{}), text:val("f_text"), owner:val("f_owner").toUpperCase(), due:val("f_due"), projectId:val("f_projectId"), done:!!document.getElementById("f_done")?.checked, notes:val("f_notes")}; }
 
 /* Meeting snapshot */
 function meetingHTML(dr){
@@ -715,6 +777,7 @@ function meetingHTML(dr){
     ${m.summary?`<div><h3 class="sec">Summary</h3><p class="prose">${esc(m.summary)}</p></div>`:""}
     <div><h3 class="sec">Project list as it stood</h3>${snap.length?projectTableHTML(snap.map(s=>({...s, updateDate:"", createdInMeeting:null})),{grouped:true,archive:false}).replace(/data-act="open-project"/g,'data-act="open-project-snap"'):'<p class="t2">No snapshot.</p>'}</div>
     <div><h3 class="sec">To-dos from this meeting</h3>${todoListHTML(todos,{showProject:true})}</div>
+    ${S.developments.some(d=>d.meetingId===m.id)?`<div><h3 class="sec">Key developments</h3>${devCardsHTML(S.developments.filter(d=>d.meetingId===m.id))}</div>`:""}
   </div>
   <div class="drawer-f">${dr.confirmDelete?`<span class="over">Delete this meeting's snapshot? Projects and to-dos stay.</span><button class="btn danger sm" data-act="del-meeting-yes">Delete</button><button class="btn sm" data-act="del-no">Keep</button>`:`<button class="btn danger" data-act="del-ask">Delete snapshot</button>`}<span class="sp"></span><button class="btn" data-act="close">Close</button></div>`;
 }
@@ -800,7 +863,7 @@ function makeDb(sb){
 }
 
 function openEditor(kind,id){
-  const rec=(kind==="project"?S.projects:allTodos()).find(x=>x.id===id); if(!rec) return;
+  const rec=(kind==="project"?S.projects:allRows()).find(x=>x.id===id); if(!rec) return;
   S.drawer={kind, id, orig:JSON.parse(JSON.stringify(rec))}; renderDrawer();
   S.drawer.base = kind==="project" ? projectFormValues() : todoFormValues();
 }
@@ -1008,6 +1071,7 @@ function prepareReview(p){
     a:(p.archive||[]).map(x=>({...x, take:true})),
     t:(p.todos||[]).map(x=>({...x, take:true})),
     r:(p.reminders||[]).map(x=>({...x, take:true})),
+    k:(p.developments||[]).map(x=>({...x, take:true})),
     d:(p.todos_done||[]).map(x=>({...x, take:true}))};
 }
 function reviewHTML(dr){
@@ -1018,7 +1082,7 @@ function reviewHTML(dr){
   const selr=(k,i,f,opts,blank)=>`<select data-rv="${k}.${i}.${f}" aria-label="${esc(f)}">${blank!=null?`<option value="">${esc(blank)}</option>`:""}${opts.map(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; return `<option value="${esc(v)}"${v===rv[k][i][f]?" selected":""}>${esc(l)}</option>`; }).join("")}</select>`;
   const pname=id=>(projById(id)||{}).name||"A project";
   const projOpts=[...S.projects.filter(isOpen).map(p=>[p.id,p.name]), ...rv.n.filter(n=>n.take&&n.name).map(n=>[n.name,n.name+" (new)"])];
-  const total=["u","n","a","t","r","d"].reduce((s,k)=>s+rv[k].filter(x=>x.take).length,0);
+  const total=["u","n","a","t","r","k","d"].reduce((s,k)=>s+rv[k].filter(x=>x.take).length,0);
   const sec=(title,n,inner)=>`<div><h3 class="sec">${title} <span class="n">${n}</span></h3>${n?`<div style="display:flex;flex-direction:column;gap:10px">${inner}</div>`:`<p class="t2">None.</p>`}</div>`;
   return `<div class="drawer-b" id="rvBody">
     <div class="banner"><span>Meeting on <b>${esc(fmtDate(dr.date))}</b>. Untick anything you don't want, edit anything that's off, then save. ${rv.summary?`<br>${esc(rv.summary)}`:""}</span></div>
@@ -1048,6 +1112,9 @@ function reviewHTML(dr){
     ${sec("Reminders: people to follow up with", rv.r.length, `<div>${rv.r.map((t,i)=>`<div class="rvrem${t.take?"":" off"}"><input type="checkbox" data-rv="r.${i}.take"${t.take?" checked":""} aria-label="Add this reminder">${inp("r",i,"person","Follow up with")}${inp("r",i,"about","About what")}${inp("r",i,"owner","Who")}
         <select data-rv="r.${i}.project_ref" aria-label="Project"><option value="">No project</option>${projOpts.map(([v,l])=>`<option value="${esc(v)}"${v===t.project_ref?" selected":""}>${esc(l)}</option>`).join("")}</select>${inp("r",i,"due","By","date")}
         ${t.quote?`<div class="q">"${esc(t.quote)}"</div>`:""}</div>`).join("")}</div>`)}
+    ${sec("Key developments", rv.k.length, rv.k.map((k,i)=>`<div class="rv${k.take?"":" off"}" style="border-left-color:var(--lblue)"><div class="rh">${box("k",i,"Add to key developments")}</div>
+        <div class="rvgrid"><label class="f full">Headline${inp("k",i,"title","Headline")}</label><label class="f">Topic${selr("k",i,"topic",DEV_TOPICS)}</label><span></span><span></span>
+          <label class="f full">Detail${ta("k",i,"detail",2)}</label></div>${k.quote?`<div class="why">"${esc(k.quote)}"</div>`:""}</div>`).join(""))}
     ${sec("Open to-dos and reminders the meeting said are done", rv.d.length, rv.d.map((d,i)=>{ const t=allTodos().find(x=>x.id===d.todo_id)||{}; return `<div class="rv a${d.take?"":" off"}"><div class="rh">${box("d",i,`Mark done: ${esc(t.kind==="reminder"?`follow up with ${t.person||""}${t.text?`: ${t.text}`:""}`:t.text||"to-do")}`)}</div>${d.reason?`<div class="why">${esc(d.reason)}</div>`:""}</div>`; }).join(""))}
   </div>
   <div class="drawer-f"><button class="btn" data-act="tr-back">Back</button><span class="sp"></span><span class="t2">${total} change${total===1?"":"s"} selected</span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="tr-save">Save and record the meeting</button></div>`;
@@ -1077,6 +1144,9 @@ async function applyReview(){
     for(const t of rv.r.filter(x=>x.take&&(String(x.person).trim()||String(x.about).trim()))){
       const pid=projById(t.project_ref)?t.project_ref:(nameToId[t.project_ref]||"");
       await S.db.collection("todos").doc("r"+uid()).set({kind:"reminder", person:String(t.person||"").trim(), text:String(t.about||"").trim(), owner:String(t.owner||"").trim().toUpperCase(), due:t.due||"", projectId:pid, done:false, notes:"", quote:t.quote||"",
+        meetingId:mid, meetingDate:date, createdAt:Date.now(), createdBy:S.meId||"", ...m},{quiet:true}); made++; }
+    for(const k of rv.k.filter(x=>x.take&&String(x.title||x.detail).trim())){
+      await S.db.collection("todos").doc("k"+uid()).set({kind:"development", text:String(k.title||"").trim()||String(k.detail).trim().slice(0,120), notes:String(k.detail||"").trim(), topic:DEV_TOPICS.includes(k.topic)?k.topic:"Other", quote:k.quote||"", done:false,
         meetingId:mid, meetingDate:date, createdAt:Date.now(), createdBy:S.meId||"", ...m},{quiet:true}); made++; }
     for(const d of rv.d.filter(x=>x.take)){ try{ await S.db.collection("todos").doc(d.todo_id).update({done:true, doneAt:date, ...m},{quiet:true}); made++; }catch(e){ if(!(e&&e.code==="not_found")) throw e; } }
     await refetch("projects"); await refetch("todos");
@@ -1173,7 +1243,8 @@ async function exportWorkbook(){
   X.utils.book_append_sheet(wb, sheet([["Owner","To-do","Project","Due","Done","From meeting"], ...sortTodos([...S.todos]).map(t=>[t.owner||"", t.text, (projById(t.projectId)||{}).name||"", t.due||"", t.done?"Yes":"", t.meetingDate||""])],[8,60,30,12,6,14]), "To-dos");
   X.utils.book_append_sheet(wb, sheet([["Project","Description","Stakeholders","Corp Dev","Status","Last update","Closed"], ...S.projects.filter(p=>!isOpen(p)).sort((a,b)=>String(b.closedAt||"").localeCompare(String(a.closedAt||""))).map(p=>[p.name,p.description||"",p.stakeholders||"",p.corpDev||"",p.status,p.update||"",p.closedAt||""])],[30,50,22,16,10,60,12]), "Old Projects");
   X.utils.book_append_sheet(wb, sheet([["Who","Follow up with","About","Project","By","Done","From meeting"], ...sortTodos([...S.reminders]).map(t=>[t.owner||"", t.person||"", t.text||"", (projById(t.projectId)||{}).name||"", t.due||"", t.done?"Yes":"", t.meetingDate||""])],[8,26,50,30,12,6,14]), "Reminders");
-  const used=new Set(["Current","To-dos","Reminders","Old Projects"]);
+  X.utils.book_append_sheet(wb, sheet([["Date","Topic","Headline","Detail"], ...[...S.developments].sort((a,b)=>devDate(b).localeCompare(devDate(a))).map(d=>[devDate(d), d.topic||"Other", d.text||"", d.notes||""])],[12,18,50,80]), "Key developments");
+  const used=new Set(["Current","To-dos","Reminders","Key developments","Old Projects"]);
   for(const mt of [...S.meetings].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,26)){
     const [y,mo,da]=mt.date.split("-"); let nm=`${mo}.${da}.${y.slice(2)}`; if(used.has(nm)) continue; used.add(nm);
     X.utils.book_append_sheet(wb, sheet([["","Project","Description","Stakeholders","Corp Dev","Status",`${us(mt.date)} Update`], ...grouped((mt.snapshot||[]).map(s=>({...s})))],[28,30,50,22,16,10,60]), nm);
@@ -1198,7 +1269,7 @@ document.addEventListener("click", async e=>{
     case "settings": S.drawer={kind:"settings"}; renderDrawer(); break;
     case "save-settings": { const on=!!document.getElementById("f_auto")?.checked;
       if(await guard(async()=>{ const {error}=await S.sb.from("settings").upsert({id:"claude", doc:{...(S.settings.claude||{}), autoCategory:on}}); if(error) throw error; await loadSettings(); }, "Settings saved")) closeDrawer(); break; }
-    case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "af": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
+    case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "af": case "dtopic": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
     case "open-project": goRecord("project",id); break;
     case "open-project-snap": if(id&&projById(id)){ S.drawer=null; goRecord("project",id); } break;
     case "open-todo": goRecord("todo",id); break;
@@ -1244,12 +1315,13 @@ document.addEventListener("keydown", e=>{
 document.addEventListener("submit", async e=>{ e.preventDefault();
   if(e.target.id==="loginForm"){ doLogin(); return; }
   if(e.target.id==="pwForm"){ savePassword(); return; }
+  if(e.target.id==="addDevForm"){ if(await addDevelopment({text:val("nd_text"), topic:val("nd_topic"), notes:val("nd_notes")})){ ["nd_text","nd_notes"].forEach(i=>{ const x=document.getElementById(i); if(x) x.value=""; }); document.getElementById("nd_text")?.focus(); } return; }
   if(e.target.id==="addRemForm"){ if(await addReminder({person:val("nr_person"), text:val("nr_text"), owner:val("nr_owner")})){ const x=document.getElementById("nr_person"); if(x){ x.value=""; x.focus(); } } return; }
   if(e.target.id==="addTodoForm"){ if(await addTodo({text:val("nt_text"), owner:val("nt_owner"), due:val("nt_due")})){ const x=document.getElementById("nt_text"); if(x){ x.value=""; x.focus(); } } }
 });
 document.addEventListener("input", e=>{
   const id=e.target.id;
-  if(id==="q"||id==="aq"||id==="tq"){ S[id]=e.target.value; render(); return; }
+  if(id==="q"||id==="aq"||id==="tq"||id==="dq"){ S[id]=e.target.value; render(); return; }
   if(id==="f_ttext"){ const i=document.getElementById("trInfo"); if(i) i.textContent=e.target.value.trim()?`${e.target.value.trim().length.toLocaleString("en-US")} characters`:""; return; }
   const rvp=e.target.dataset&&e.target.dataset.rv; if(rvp&&S.drawer&&S.drawer.rv&&e.target.type!=="checkbox"){ const [k,i,f]=rvp.split("."); S.drawer.rv[k][+i][f]=e.target.value; }
 });
@@ -1268,7 +1340,7 @@ async function refetch(table){
   const {data, error}=await S.sb.from(table).select("id,doc,updated_at,updated_by");
   if(error){ if(!S.loaded[table]) toast("Couldn't load the tracker: "+error.message); return; }
   const rows=(data||[]).map(r=>({...(r.doc||{}), id:r.id, _v:r.updated_at, _by:r.updated_by}));
-  if(table==="todos"){ S.reminders=rows.filter(r=>r.kind==="reminder"); S.todos=rows.filter(r=>r.kind!=="reminder"); } else S[table]=rows;
+  if(table==="todos"){ S.reminders=rows.filter(r=>r.kind==="reminder"); S.developments=rows.filter(r=>r.kind==="development"); S.todos=rows.filter(r=>r.kind!=="reminder"&&r.kind!=="development"); } else S[table]=rows;
   if(table==="projects") S.projects.forEach(p=>{ if(!STATUSES.includes(p.status)) p.status="Active"; });
   S.loaded[table]=true; if(TABLES.every(t=>S.loaded[t])) clearTimeout(startData.timer);
   if(table==="projects" && S.changes && !S.changes.loading) S.changes=null;

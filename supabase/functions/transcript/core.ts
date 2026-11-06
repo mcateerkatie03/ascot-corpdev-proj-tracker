@@ -13,6 +13,8 @@ export const STAGES = ["Screening", "NDA signed", "LOI", "Diligence", "Closed", 
 export const STATUSES = ["Active", "Pending", "Completed", "Dropped"] as const;
 export const OPEN_STATUSES = ["Active", "Pending"] as const;
 
+export const DEV_TOPICS = ["Industry trends", "Company news", "Market and deals", "Regulation", "Ascot", "Other"] as const;
+
 export const MAX_TRANSCRIPT_CHARS = 400_000;
 
 export type Project = {
@@ -50,6 +52,7 @@ What to propose:
 - archive: projects the meeting said are finished (status Completed) or killed, dropped or to be removed without finishing (status Dropped).
 - todos: concrete action items for the coming week: who does what, by when. owner is the person's initials from the team list when they are on the team, otherwise their name. due is YYYY-MM-DD when a date or day was said ("by Friday" is the Friday after the meeting date), otherwise "". project_ref is the id of an existing project, the exact name of a project in new_projects, or "". quote is a short phrase from the transcript that supports it.
 - reminders: people to follow up with, so the team remembers to get in touch. Examples: "we need to schedule a meeting with B. Sample" (person "B. Sample", about "Schedule a meeting"), "I need to check with C. Person when he's back in New York" (person "C. Person", about "Check when he's back in New York"). person is the name as said (with company if mentioned); about is a short phrase on what to follow up on; owner, project_ref, due and quote work as for todos. An item that is mainly about contacting someone goes in reminders, not todos; don't list it twice.
+- developments: key developments discussed that are not about a specific project on the list: industry trends, news about other companies (results, deals, people moves), market and pricing moves, regulation, and Ascot company news. title is a short headline in sentence case; detail is one to three plain sentences on what was said and why it matters; topic is one of Industry trends, Company news, Market and deals, Regulation, Ascot, Other; quote is a short supporting phrase. Leave out small talk and anything already captured as a project update, to-do or reminder.
 - todos_done: open to-dos and reminders (listed in the user message) that the meeting said are done.
 - summary: two or three plain sentences on what the meeting covered.
 
@@ -76,6 +79,7 @@ export const SCHEMA = obj({
   archive: { type: "array", items: obj({ project_id: str, status: { type: "string", enum: ["Completed", "Dropped"] }, reason: str }) },
   todos: { type: "array", items: obj({ text: str, owner: str, project_ref: str, due: str, quote: str }) },
   reminders: { type: "array", items: obj({ person: str, about: str, owner: str, project_ref: str, due: str, quote: str }) },
+  developments: { type: "array", items: obj({ title: str, detail: str, topic: { type: "string", enum: [...DEV_TOPICS] }, quote: str }) },
   todos_done: { type: "array", items: obj({ todo_id: str, reason: str }) },
 });
 
@@ -127,6 +131,7 @@ export type Proposal = {
   archive: { project_id: string; status: string; reason: string }[];
   todos: { text: string; owner: string; project_ref: string; due: string; quote: string }[];
   reminders: { person: string; about: string; owner: string; project_ref: string; due: string; quote: string }[];
+  developments: { title: string; detail: string; topic: string; quote: string }[];
   todos_done: { todo_id: string; reason: string }[];
 };
 
@@ -169,5 +174,9 @@ export function cleanProposal(raw: unknown, i: Input): Proposal {
     return { person: clip(m.person, 120).trim(), about: clip(m.about, 400).trim(), owner: clip(m.owner, 60).trim(), due: date(m.due), quote: clip(m.quote, 300),
       project_ref: ids.has(ref) || newNames.has(ref.toLowerCase()) ? ref : "" };
   }).filter((m) => once("r:" + (m.person + "|" + m.about).toLowerCase()));
-  return { summary: clip(r.summary, 2000), project_updates, new_projects, archive, todos, reminders, todos_done };
+  const developments = list(r.developments).filter((d) => String(d.title ?? "").trim() || String(d.detail ?? "").trim()).map((d) => ({
+    title: clip(d.title, 200).trim(), detail: clip(d.detail, 1500).trim(), quote: clip(d.quote, 300),
+    topic: (DEV_TOPICS as readonly string[]).includes(String(d.topic)) ? String(d.topic) : "Other",
+  })).filter((d) => once("k:" + (d.title || d.detail).toLowerCase()));
+  return { summary: clip(r.summary, 2000), project_updates, new_projects, archive, todos, reminders, developments, todos_done };
 }

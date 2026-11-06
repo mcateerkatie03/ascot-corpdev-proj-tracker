@@ -21,6 +21,8 @@ const todos = [
   { id: "t4", doc: { text: "Later thing", owner: "JD", due: iso(now + 20 * DAY), done: false } },
   { id: "r1", doc: { kind: "reminder", person: "B. Sample", text: "Schedule a meeting", owner: "WL", projectId: "p1", due: iso(now - 1 * DAY), done: false } },
   { id: "r2", doc: { kind: "reminder", person: "C. Done", text: "x", done: true } },
+  { id: "k1", doc: { kind: "development", text: "Casualty rates softening", notes: "Brokers report decreases.", topic: "Industry trends", meetingDate: iso(now - 3 * DAY) } },
+  { id: "k2", doc: { kind: "development", text: "Old news", topic: "Other", meetingDate: iso(now - 30 * DAY) } },
 ];
 const history = [
   { tbl: "projects", record_id: "p4", op: "update", changes: { status: { from: "Active", to: "Dropped" } }, changed_at: new Date(now - 2 * DAY).toISOString() },
@@ -66,6 +68,7 @@ ok("counts", JSON.stringify(dry.counts) === JSON.stringify({ open: 4, pending: 1
 ok("subject", dry.subject === "Corp Dev weekly: 4 open projects, 1 to-do due this week, 1 overdue", dry.subject);
 ok("overdue to-do with owner, project and link", dry.text.includes("- ZT: Send draft (Harbor Review), due 7 Nov https://example.github.io/tracker/#todo/t1"), dry.text);
 ok("reminders section, not counted as overdue to-dos", dry.text.includes("- WL: follow up with B. Sample, Schedule a meeting (Harbor Review)") && !dry.text.includes("C. Done") && dry.counts.overdue === 1, dry.text);
+ok("key developments from the last week only", dry.text.includes("- Industry trends: Casualty rates softening. Brokers report decreases.") && !dry.text.includes("Old news") && !dry.text.includes("Casualty rates softening, due"), dry.text);
 ok("done and later to-dos left out", !dry.text.includes("Done thing") && !dry.text.includes("Later thing"));
 ok("pending shows first update line", dry.text.includes("- Cell <Partnership>: Awaiting proposal"), dry.text);
 ok("quiet project listed", dry.text.includes("- Lantern: last update 10 Oct"), dry.text);
