@@ -81,6 +81,8 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("dropped project not on the dashboard", !(await p.$('tr[data-id="p5"]')));
   ok("updated tag on p1", !!(await p.$('tr[data-id="p1"] .tag.upd')));
   ok("quiet tag on p3", !!(await p.$('tr[data-id="p3"] .tag.quiet')));
+  ok("last updated shows the meeting date", (await p.textContent('tr[data-id="p1"] td.lastupd')).includes("4 days ago") && (await p.textContent('tr[data-id="p2"] td.lastupd')).includes("days ago"));
+  ok("last updated flagged after three weeks", !!(await p.$('tr[data-id="p3"] td.lastupd .ago.late')) && (await p.textContent('tr[data-id="p3"] td.lastupd')).includes("5 weeks ago"));
   ok("pending pill", (await p.textContent('tr[data-id="p2"] .pill')).trim() === "Pending");
   ok("deal stage on external project", (await p.textContent('tr[data-id="p3"]')).includes("Deal stage: NDA signed"));
   const wk = await p.$$eval("section.cols .todo", x => x.map(e => e.dataset.id));
@@ -93,7 +95,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("reminders panel beside the table", (await p.$$(".weekgrid > aside.reminders")).length === 1);
   ok("reminder shows person and topic", (await p.textContent('.reminders .todo[data-id="r1"]')).includes("B. Sample: Schedule a meeting"));
   ok("reminders not counted as to-dos", tiles[2] === "3" && !(await p.$('section.cols .todo[data-id="r1"]')));
-  ok("corp dev and stakeholders columns removed", (await p.$$eval("thead th", x => x.map(e => e.textContent).join("|"))) === "Project|Status|Description|This week's update");
+  ok("corp dev and stakeholders columns removed", (await p.$$eval("thead th", x => x.map(e => e.textContent).join("|"))) === "Project|Status|Description|This week's update|Last updated");
   await p.fill("#nr_person", "D. Example"); await p.fill("#nr_text", "Ask about the renewal"); await p.press("#nr_text", "Enter"); await p.waitForTimeout(200);
   const rNew = (await docs(p, "todos")).find(t => t.person === "D. Example");
   ok("reminder added from the panel", rNew && rNew.kind === "reminder" && rNew.text === "Ask about the renewal" && rNew.owner === "ZT", rNew);

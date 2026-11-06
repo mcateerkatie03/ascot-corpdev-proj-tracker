@@ -114,7 +114,7 @@ footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-bl
 .remdone summary{cursor:pointer;color:var(--blue);text-decoration:underline}
 .remdone .todos{margin-top:4px}
 .reminders .todo .due{grid-column:2;text-align:left}
-.rem .who{color:var(--purple)}
+.rem .rwho{color:var(--purple)}
 .addrem{display:grid;grid-template-columns:70px minmax(0,1fr);gap:6px;margin-top:10px}
 .addrem #nr_person,.addrem #nr_text{grid-column:1/-1}
 .addrem .btn{justify-content:center}
@@ -145,6 +145,9 @@ td .t1{font-weight:bold}
 td .t2,.t2{font-size:12px;color:var(--muted)}
 td.desc{min-width:200px;max-width:340px}
 td.upd{min-width:240px;max-width:520px}
+td.lastupd{white-space:nowrap;min-width:96px}
+td.lastupd .ago{font-size:12px;color:var(--muted)}
+td.lastupd .ago.late{color:var(--magenta);font-weight:bold}
 .clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .prose{white-space:pre-wrap;margin:0;overflow-wrap:anywhere}
 tr.cathead td{background:var(--tile)!important;border-top:2px solid var(--ink);font-weight:bold;font-size:13px;cursor:default}
@@ -491,7 +494,7 @@ function remListHTML(list){
   return `<ul class="todos">${list.map(t=>{ const p=t.projectId&&projById(t.projectId), od=todoOverdue(t), carried=!t.done&&lm&&t.meetingDate&&t.meetingDate<lm.date;
     const meta=[t.owner?`<span class="owner">${esc(t.owner)}</span>`:"", p?esc(p.name):"", carried?`<span class="carry">From ${esc(fmtDate(t.meetingDate))}</span>`:""].filter(Boolean).join(" ");
     return `<li class="todo rem${t.done?" done":""}" data-id="${esc(t.id)}"><input type="checkbox" data-act="todo-done" data-id="${esc(t.id)}" ${t.done?"checked":""} aria-label="Done: follow up with ${esc(t.person||"")}">
-      <div class="tx" data-act="open-todo" data-id="${esc(t.id)}" tabindex="0"><b>${t.person?`<span class="who">${esc(t.person)}</span>${t.text?": ":""}`:""}${esc(t.text||"")}</b>${meta?`<div class="meta">${meta}</div>`:""}</div>
+      <div class="tx" data-act="open-todo" data-id="${esc(t.id)}" tabindex="0"><b>${t.person?`<span class="rwho">${esc(t.person)}</span>${t.text?": ":""}`:""}${esc(t.text||"")}</b>${meta?`<div class="meta">${meta}</div>`:""}</div>
       ${t.due?`<div class="due${od?" over":""}">${od?"Overdue: ":""}${esc(fmtDate(t.due))}</div>`:""}</li>`; }).join("")}</ul>`;
 }
 function remindersPanelHTML(){
@@ -504,7 +507,14 @@ function remindersPanelHTML(){
 }
 
 /* Project table, grouped by category, with the description on every row */
-function projectTableHTML(list, {grouped, archive}={}){
+/* Last updated: the meeting date the project's update came from (or the day it was edited by hand) */
+function lastUpdatedHTML(p){
+  if(!p.updateDate) return `<span class="t2">n/d</span>`;
+  const d=-daysUntil(p.updateDate), late=isOpen(p)&&d>=QUIET_DAYS;
+  const ago = d<=0 ? "today" : d<14 ? `${d} day${d===1?"":"s"} ago` : `${Math.floor(d/7)} weeks ago`;
+  return `<div>${esc(fmtDate(p.updateDate))}</div><div class="ago${late?" late":""}">${ago}</div>`;
+}
+function projectTableHTML(list, {grouped, archive, noDate}={}){
   if(!list.length) return `<div class="empty"><p>No projects match.</p></div>`;
   const cats=[...CATEGORIES, NO_CAT];
   const sorted=[...list].sort((a,b)=>cats.indexOf(catOf(a))-cats.indexOf(catOf(b)) || String(a.quarter||"").localeCompare(String(b.quarter||"")) || (a.order??1e9)-(b.order??1e9) || String(a.name).localeCompare(String(b.name)));
@@ -513,13 +523,14 @@ function projectTableHTML(list, {grouped, archive}={}){
       ${p.description?`<div class="t2 mob">${esc(p.description)}</div>`:""}</td>
     <td class="c-side">${statusPill(p.status)}${archive&&p.closedAt?`<div class="t2">${esc(fmtDate(p.closedAt))}</div>`:""}</td>
     <td class="desc c-hide"><div class="clamp prose">${esc(p.description||"")||'<span class="t2">No description</span>'}</div></td>
-    <td class="upd c-full" data-label="${archive?"Last update":"Update"}">${p.update?`<div class="prose clamp">${esc(p.update)}</div>`:'<span class="t2">No update yet</span>'}${p.updateDate&&!archive?`<div class="t2">${esc(fmtDate(p.updateDate))}</div>`:""}</td>
+    <td class="upd c-full" data-label="${archive?"Last update":"Update"}">${p.update?`<div class="prose clamp">${esc(p.update)}</div>`:'<span class="t2">No update yet</span>'}</td>
+    ${noDate?"":`<td class="lastupd c-full" data-label="Last updated">${lastUpdatedHTML(p)}</td>`}
 </tr>`;
-  let body="";
+  let body=""; const cols=noDate?4:5;
   if(grouped){ for(const c of cats){ const g=sorted.filter(p=>catOf(p)===c); if(!g.length && (c===NO_CAT || archive)) continue;
-      body+=`<tr class="cathead"><td colspan="4">${esc(c)} <span class="t2">(${g.length})</span></td></tr>`+(g.length?g.map(row).join(""):`<tr><td colspan="4" class="t2">None at the moment.</td></tr>`); } }
+      body+=`<tr class="cathead"><td colspan="${cols}">${esc(c)} <span class="t2">(${g.length})</span></td></tr>`+(g.length?g.map(row).join(""):`<tr><td colspan="${cols}" class="t2">None at the moment.</td></tr>`); } }
   else body=sorted.map(row).join("");
-  return `<section><div class="tbl-wrap cardwrap"><table class="cards"><thead><tr><th>Project</th><th>Status</th><th>Description</th><th>${archive?"Last update":"This week's update"}</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
+  return `<section><div class="tbl-wrap cardwrap"><table class="cards"><thead><tr><th>Project</th><th>Status</th><th>Description</th><th>${archive?"Last update":"This week's update"}</th>${noDate?"":"<th>Last updated</th>"}</tr></thead><tbody>${body}</tbody></table></div></section>`;
 }
 
 /* Projects: the editable list with filters */
@@ -782,7 +793,7 @@ function meetingHTML(dr){
   return `${drHead("Weekly meeting", esc(fmtDate(m.date))+(m.title?`: ${esc(m.title)}`:""))}
   <div class="drawer-b">
     ${m.summary?`<div><h3 class="sec">Summary</h3><p class="prose">${esc(m.summary)}</p></div>`:""}
-    <div><h3 class="sec">Project list as it stood</h3>${snap.length?projectTableHTML(snap.map(s=>({...s, updateDate:"", createdInMeeting:null})),{grouped:true,archive:false}).replace(/data-act="open-project"/g,'data-act="open-project-snap"'):'<p class="t2">No snapshot.</p>'}</div>
+    <div><h3 class="sec">Project list as it stood</h3>${snap.length?projectTableHTML(snap.map(s=>({...s, updateDate:"", createdInMeeting:null})),{grouped:true,archive:false,noDate:true}).replace(/data-act="open-project"/g,'data-act="open-project-snap"'):'<p class="t2">No snapshot.</p>'}</div>
     <div><h3 class="sec">To-dos from this meeting</h3>${todoListHTML(todos,{showProject:true})}</div>
     ${S.developments.some(d=>d.meetingId===m.id)?`<div><h3 class="sec">Key developments</h3>${devCardsHTML(S.developments.filter(d=>d.meetingId===m.id))}</div>`:""}
   </div>
