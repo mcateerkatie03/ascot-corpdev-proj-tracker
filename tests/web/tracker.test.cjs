@@ -101,11 +101,18 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("reminder opens with the person field", (await p.inputValue("#f_person")) === "D. Example");
   await p.fill("#f_person", "D. Example (Sample Co)"); await p.click('.drawer-f [data-act="save-todo"]'); await p.waitForTimeout(200);
   ok("reminder edited", (await doc(p, "todos", rNew.id)).person === "D. Example (Sample Co)");
-  await p.click(`.reminders .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(200);
-  ok("reminder ticked off leaves the panel", (await doc(p, "todos", rNew.id)).done === true && !(await p.$(`.reminders .todo[data-id="${rNew.id}"]`)));
+  await p.click(`.reminders .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(800);
+  ok("reminder ticked off leaves the panel", (await doc(p, "todos", rNew.id)).done === true && !(await p.$(`.reminders > ul .todo[data-id="${rNew.id}"]`)));
+  ok("undo offered after ticking", (await p.textContent("#toastRoot")).includes("Followed up with D. Example (Sample Co)") && !!(await p.$('#toastRoot [data-act="toast-undo"]')));
+  await p.click('#toastRoot [data-act="toast-undo"]'); await p.waitForTimeout(250);
+  ok("undo puts it back", (await doc(p, "todos", rNew.id)).done === false && !!(await p.$(`.reminders > ul .todo[data-id="${rNew.id}"]`)));
+  await p.click(`.reminders > ul .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(800);
+  ok("done reminders kept under Show done", (await p.textContent(".remdone summary")).includes("Show done (1 this week"));
+  await p.click(".remdone summary"); await p.click(`.remdone .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(400);
+  ok("unticking from Show done reopens it", (await doc(p, "todos", rNew.id)).done === false);
 
   // tick a to-do
-  await p.click('.todo[data-id="t1"] input[type=checkbox]'); await p.waitForTimeout(200);
+  await p.click('.todo[data-id="t1"] input[type=checkbox]'); await p.waitForTimeout(800);
   const t1 = await doc(p, "todos", "t1");
   ok("to-do ticked done", t1.done === true && !!t1.doneAt, t1);
 

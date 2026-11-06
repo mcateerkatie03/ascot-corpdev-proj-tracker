@@ -106,7 +106,13 @@ footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-bl
 .reminders{position:sticky;top:12px;background:var(--alt);border-top:3px solid var(--purple);padding:12px 14px 14px}
 .reminders h3{margin:0 0 2px;font-size:15px;color:var(--purple)}
 .reminders .hint{font-size:12px;color:var(--muted);margin:0 0 6px}
-.reminders .todo{grid-template-columns:24px minmax(0,1fr)}
+.reminders .todo{grid-template-columns:28px minmax(0,1fr)}
+.reminders .todo input[type=checkbox]{width:20px;height:20px;margin-top:1px}
+.todo.leaving .tx b{text-decoration:line-through;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.todo.leaving{transition:opacity .5s ease-in;opacity:.35}}
+.remdone{margin-top:8px;font-size:12px}
+.remdone summary{cursor:pointer;color:var(--blue);text-decoration:underline}
+.remdone .todos{margin-top:4px}
 .reminders .todo .due{grid-column:2;text-align:left}
 .rem .who{color:var(--purple)}
 .addrem{display:grid;grid-template-columns:70px minmax(0,1fr);gap:6px;margin-top:10px}
@@ -217,6 +223,7 @@ label.chk input{margin-top:3px}
 .kv dt{font-weight:bold}.kv dd{margin:0}
 .empty{border:1px dashed var(--grid);padding:28px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
 .empty p{margin:0;max-width:60ch}
+.toast .undo{margin-left:12px;background:none;border:0;padding:0;color:#fff;font:inherit;font-weight:bold;text-decoration:underline;cursor:pointer}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;z-index:60;font-size:13px;max-width:calc(100% - 32px)}
 .lastsaved{margin-top:4px;font-size:12px;color:var(--muted)}
 #drAlert:empty{display:none}
@@ -371,7 +378,7 @@ function daysUntil(s){ if(!s) return null; return Math.round((new Date(s+"T00:00
 function addDays(s,n){ const d=new Date(s+"T00:00:00"); d.setDate(d.getDate()+n); return iso(d); }
 function safeUrl(u){ try{ const x=new URL(String(u).trim()); return (x.protocol==="https:"||x.protocol==="http:") ? x.href : null; }catch{ return null; } }
 function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
-function toast(msg){ const r=document.getElementById("toastRoot"); r.innerHTML=`<div class="toast" role="status">${esc(msg)}</div>`; clearTimeout(toast.t); toast.t=setTimeout(()=>{ r.innerHTML=""; },3600); }
+function toast(msg, undo){ const r=document.getElementById("toastRoot"); toast.undo=undo||null; r.innerHTML=`<div class="toast" role="status">${esc(msg)}${undo?`<button type="button" class="undo" data-act="toast-undo">Undo</button>`:""}</div>`; clearTimeout(toast.t); toast.t=setTimeout(()=>{ r.innerHTML=""; toast.undo=null; }, undo?7000:3600); }
 function nameOf(id, stored){ if(stored) return stored; if(!id) return "Someone"; const p=S.profiles[id]; return (p && p.name) || "Teammate"; }
 const val = id => (document.getElementById(id)?.value ?? "").trim();
 const isOpen = p => OPEN.includes(p.status||"Active");
@@ -488,10 +495,10 @@ function remListHTML(list){
       ${t.due?`<div class="due${od?" over":""}">${od?"Overdue: ":""}${esc(fmtDate(t.due))}</div>`:""}</li>`; }).join("")}</ul>`;
 }
 function remindersPanelHTML(){
-  const open=sortTodos(S.reminders.filter(r=>!r.done)), done=S.reminders.filter(r=>r.done&&r.doneAt&&r.doneAt>=addDays(TODAY(),-7)).length;
+  const open=sortTodos(S.reminders.filter(r=>!r.done)), doneList=S.reminders.filter(r=>r.done&&r.doneAt&&r.doneAt>=addDays(TODAY(),-30)).sort((a,b)=>String(b.doneAt).localeCompare(String(a.doneAt))), done=doneList.filter(r=>r.doneAt>=addDays(TODAY(),-7)).length;
   return `<aside class="reminders" aria-labelledby="remHead"><h3 id="remHead">Reminders <span class="t2">(${open.length})</span></h3>
     <p class="hint">People to follow up with, from the meetings. Tick one off once you've been in touch.</p>
-    ${remListHTML(open)}${done?`<p class="t2" style="margin:6px 0 0">${done} followed up this week.</p>`:""}
+    ${remListHTML(open)}${doneList.length?`<details class="remdone"${S.remShowDone?" open":""}><summary data-act="rem-showdone">Show done (${done} this week, ${doneList.length} in 30 days)</summary>${remListHTML(doneList)}</details>`:""}
     <form class="addrem" id="addRemForm" aria-label="Add a reminder"><input type="text" id="nr_person" placeholder="Follow up with (name)" aria-label="Follow up with"><input type="text" id="nr_text" placeholder="About what, e.g. schedule a meeting" aria-label="About what"><input type="text" id="nr_owner" placeholder="Who" aria-label="Who follows up" value="${esc(myInitials())}" list="ownerListR"><button class="btn sm primary">Add reminder</button>
       <datalist id="ownerListR">${teamInitials().map(i=>`<option value="${esc(i)}">`).join("")}</datalist></form></aside>`;
 }
@@ -951,8 +958,10 @@ async function deleteRecord(){
   else if(dr.kind==="meeting"){ if(await guard(()=>S.db.collection("meetings").doc(dr.id).delete(), "Snapshot deleted")) closeDrawer(); }
 }
 async function toggleTodo(id, done){
+  const row=allRows().find(x=>x.id===id), rem=row&&row.kind==="reminder";
+  if(done){ document.querySelectorAll(`.todo[data-id="${CSS.escape(id)}"]`).forEach(li=>li.classList.add("leaving")); await new Promise(r=>setTimeout(r,500)); }
   const ok=await guard(()=>S.db.collection("todos").doc(id).update({done, doneAt:done?TODAY():"", ...meta()}));
-  if(ok) toast(done?"Done":"Reopened");
+  if(ok){ if(done) toast(rem?`Followed up with ${row.person||"them"}`:"Done", ()=>toggleTodo(id,false)); else toast(rem?"Back on the reminders list":"Reopened"); }
   if(S.drawer && S.drawer.kind==="project"){ S.drawer.rendered=false; captureForm(); renderDrawer(); restoreForm(); }
 }
 async function addTodo({text, owner, due, projectId}){
@@ -1278,6 +1287,8 @@ document.addEventListener("click", async e=>{
     case "save-project": t.disabled=true; await saveRecord("project"); t.disabled=false; break;
     case "save-todo": t.disabled=true; await saveRecord("todo"); t.disabled=false; break;
     case "todo-done": await toggleTodo(id, t.checked); break;
+    case "toast-undo": { const fn=toast.undo; document.getElementById("toastRoot").innerHTML=""; toast.undo=null; if(fn) await fn(); break; }
+    case "rem-showdone": S.remShowDone=!S.remShowDone; break;
     case "add-ptodo": { const dr=S.drawer; if(!dr) return; t.disabled=true; if(await addTodo({text:val("pt_text"), owner:val("pt_owner"), due:val("pt_due"), projectId:dr.id})){ captureForm(); dr.rendered=false; renderDrawer(); restoreForm(); } t.disabled=false; break; }
     case "cat-ok": { const dr=S.drawer; if(await guard(()=>S.db.collection("projects").doc(dr.id).update({categoryCheck:false, ...meta()}),"Category confirmed")){ dr.orig.categoryCheck=false; rerenderDrawer(); } break; }
     case "add-link": readLinks(); S.drawer.links.push({label:"",url:""}); document.getElementById("linkRows").innerHTML=linkRowsHTML(S.drawer.links); break;
