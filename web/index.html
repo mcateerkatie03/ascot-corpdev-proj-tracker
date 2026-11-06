@@ -89,6 +89,22 @@ footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-bl
 
 /* To-do rows */
 .todos{list-style:none;margin:0;padding:0}
+/* Dashboard: project table with the reminders panel beside it */
+.weekgrid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+.weekgrid>*{min-width:0}
+.reminders{position:sticky;top:12px;background:var(--alt);border-top:3px solid var(--purple);padding:12px 14px 14px}
+.reminders h3{margin:0 0 2px;font-size:15px;color:var(--purple)}
+.reminders .hint{font-size:12px;color:var(--muted);margin:0 0 6px}
+.reminders .todo{grid-template-columns:24px minmax(0,1fr)}
+.reminders .todo .due{grid-column:2;text-align:left}
+.rem .who{color:var(--purple)}
+.addrem{display:grid;grid-template-columns:70px minmax(0,1fr);gap:6px;margin-top:10px}
+.addrem #nr_person,.addrem #nr_text{grid-column:1/-1}
+.addrem .btn{justify-content:center}
+@media (max-width:1100px){.weekgrid{grid-template-columns:1fr}.reminders{position:static}}
+.rvrem{display:grid;grid-template-columns:24px minmax(0,1fr) minmax(0,1.5fr) 70px minmax(0,1.1fr) 140px;gap:6px;align-items:start;padding:6px 0;border-bottom:1px solid var(--grid)}
+.rvrem .q{grid-column:2/-1;font-size:11px;color:var(--muted);font-style:italic;margin-top:-2px}
+@media (max-width:700px){.rvrem{grid-template-columns:24px 1fr 1fr}.rvrem .q{grid-column:1/-1}}
 .todo{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px 10px;align-items:start;padding:9px 0;border-bottom:1px solid var(--grid)}
 .todo input[type=checkbox]{width:18px;height:18px;margin:2px 0 0;accent-color:var(--teal);cursor:pointer}
 .todo .tx{cursor:pointer;min-width:0;overflow-wrap:anywhere}
@@ -310,9 +326,9 @@ const STATUS_HELP = {Active:"Ongoing",Pending:"No update, or waiting on someone 
 const STAGES = ["Screening","NDA signed","LOI","Diligence","Closed","On hold","Dead"];   // deal stage: External Growth projects only
 const EXTERNAL = "External Growth Initiatives", BOARD = "Quarterly Board Updates";
 const PROJECT_FIELDS = ["name","category","quarter","status","stage","description","stakeholders","corpDev","update","links"];
-const TODO_FIELDS = ["text","owner","projectId","due","done","notes"];
+const TODO_FIELDS = ["person","text","owner","projectId","due","done","notes"];
 const FIELD_LABELS = {name:"Project",category:"Category",quarter:"Quarter",status:"Status",stage:"Deal stage",description:"Description",stakeholders:"Stakeholders",corpDev:"Corp Dev",update:"Weekly update",links:"Links",
-  text:"To-do",owner:"Owner",projectId:"Project",due:"Due",done:"Done",notes:"Notes",closedAt:"Closed",updateDate:"Update date"};
+  person:"Follow up with",text:"To-do",owner:"Owner",projectId:"Project",due:"Due",done:"Done",notes:"Notes",closedAt:"Closed",updateDate:"Update date"};
 const LONG_FIELDS = ["description","update","notes"];
 const QUIET_DAYS = 21;
 const DAY_MS = 86400000;
@@ -325,7 +341,7 @@ if(CFG.supabaseUrl) CFG.supabaseUrl = String(CFG.supabaseUrl).trim().replace(/\/
 const TABLES = ["projects","todos","meetings"];
 const S = {
   view:"week", sb:null, db:null, meId:null, session:null, authChecked:false, started:false, channel:null, loginErr:"", loginBusy:false,
-  projects:[], todos:[], meetings:[], loaded:{projects:false,todos:false,meetings:false}, stale:false, configMissing:false,
+  projects:[], todos:[], reminders:[], meetings:[], loaded:{projects:false,todos:false,meetings:false}, stale:false, configMissing:false,
   profiles:{}, settings:{}, hist:{}, changes:null,
   q:"", pf:"open", pcat:"all", ppl:"all", tf:"open", tpl:"all", aq:"", drawer:null
 };
@@ -348,6 +364,7 @@ const val = id => (document.getElementById(id)?.value ?? "").trim();
 const isOpen = p => OPEN.includes(p.status||"Active");
 const catOf = p => CATEGORIES.includes(p.category) ? p.category : NO_CAT;
 const projById = id => S.projects.find(p=>p.id===id);
+const allTodos = () => [...S.todos, ...S.reminders];
 const initialsList = s => String(s||"").toUpperCase().split(/[\/,&;]|\s+and\s+|\s+/).map(x=>x.trim()).filter(Boolean);
 function myInitials(){ return ((S.session && S.session.initials) || "").toUpperCase(); }
 function statusPill(st){ st=STATUSES.includes(st)?st:"Active"; return `<span class="pill s-${st}" title="${esc(STATUS_HELP[st])}">${st}</span>`; }
@@ -384,7 +401,7 @@ function openRoute(r){
   if(!S.session || !S.loaded[tbl]){ S.pendingRoute=r; return; }
   S.pendingRoute=null;
   const dr=S.drawer; if(dr && dr.id===r.id && dr.kind===r.kind) return;
-  const rec=S[tbl].find(x=>x.id===r.id);
+  const rec=(tbl==="todos"?allTodos():S[tbl]).find(x=>x.id===r.id);
   if(!rec){ toast(`That ${r.kind==="todo"?"to-do":r.kind} isn't in the tracker. It may have been deleted.`); history.replaceState(null,"","#"+S.view); S.pushed=false; return; }
   if(r.kind==="meeting"){ S.drawer={kind:"meeting",id:r.id}; renderDrawer(); }
   else openEditor(r.kind, r.id);
@@ -442,8 +459,27 @@ function renderWeek(){
       ${later?`<p class="t2" style="margin-top:6px"><a href="#todos">${later} more due later</a></p>`:""}</div>
     <div><h3 class="sec">What changed</h3>${changesHTML()}</div>
   </section>
-  ${S.projects.length ? projectTableHTML(open, {grouped:true}) : emptyStart()}
+  <div class="weekgrid"><div>${S.projects.length ? projectTableHTML(open, {grouped:true}) : emptyStart()}</div>${remindersPanelHTML()}</div>
   <p class="source">Source: Corp Dev weekly meetings${lm?`; last meeting ${esc(fmtDate(lm.date))}`:""}. Statuses: Active (ongoing), Pending (no update, or waiting on someone else).</p>`;
+}
+
+/* Reminders: people to follow up with, picked out of the transcripts (to-dos with kind "reminder") */
+function remListHTML(list){
+  if(!list.length) return `<p class="t2" style="margin:6px 0 0">Nothing to follow up on.</p>`;
+  const lm=latestMeeting();
+  return `<ul class="todos">${list.map(t=>{ const p=t.projectId&&projById(t.projectId), od=todoOverdue(t), carried=!t.done&&lm&&t.meetingDate&&t.meetingDate<lm.date;
+    const meta=[t.owner?`<span class="owner">${esc(t.owner)}</span>`:"", p?esc(p.name):"", carried?`<span class="carry">From ${esc(fmtDate(t.meetingDate))}</span>`:""].filter(Boolean).join(" ");
+    return `<li class="todo rem${t.done?" done":""}" data-id="${esc(t.id)}"><input type="checkbox" data-act="todo-done" data-id="${esc(t.id)}" ${t.done?"checked":""} aria-label="Done: follow up with ${esc(t.person||"")}">
+      <div class="tx" data-act="open-todo" data-id="${esc(t.id)}" tabindex="0"><b>${t.person?`<span class="who">${esc(t.person)}</span>${t.text?": ":""}`:""}${esc(t.text||"")}</b>${meta?`<div class="meta">${meta}</div>`:""}</div>
+      ${t.due?`<div class="due${od?" over":""}">${od?"Overdue: ":""}${esc(fmtDate(t.due))}</div>`:""}</li>`; }).join("")}</ul>`;
+}
+function remindersPanelHTML(){
+  const open=sortTodos(S.reminders.filter(r=>!r.done)), done=S.reminders.filter(r=>r.done&&r.doneAt&&r.doneAt>=addDays(TODAY(),-7)).length;
+  return `<aside class="reminders" aria-labelledby="remHead"><h3 id="remHead">Reminders <span class="t2">(${open.length})</span></h3>
+    <p class="hint">People to follow up with, from the meetings. Tick one off once you've been in touch.</p>
+    ${remListHTML(open)}${done?`<p class="t2" style="margin:6px 0 0">${done} followed up this week.</p>`:""}
+    <form class="addrem" id="addRemForm" aria-label="Add a reminder"><input type="text" id="nr_person" placeholder="Follow up with (name)" aria-label="Follow up with"><input type="text" id="nr_text" placeholder="About what, e.g. schedule a meeting" aria-label="About what"><input type="text" id="nr_owner" placeholder="Who" aria-label="Who follows up" value="${esc(myInitials())}" list="ownerListR"><button class="btn sm primary">Add reminder</button>
+      <datalist id="ownerListR">${teamInitials().map(i=>`<option value="${esc(i)}">`).join("")}</datalist></form></aside>`;
 }
 
 /* Project table, grouped by category, with the description on every row */
@@ -457,13 +493,12 @@ function projectTableHTML(list, {grouped, archive}={}){
     <td class="c-side">${statusPill(p.status)}${archive&&p.closedAt?`<div class="t2">${esc(fmtDate(p.closedAt))}</div>`:""}</td>
     <td class="desc c-hide"><div class="clamp prose">${esc(p.description||"")||'<span class="t2">No description</span>'}</div></td>
     <td class="upd c-full" data-label="${archive?"Last update":"Update"}">${p.update?`<div class="prose clamp">${esc(p.update)}</div>`:'<span class="t2">No update yet</span>'}${p.updateDate&&!archive?`<div class="t2">${esc(fmtDate(p.updateDate))}</div>`:""}</td>
-    <td class="c-full" data-label="Corp Dev" style="white-space:nowrap">${esc(p.corpDev||"")}</td>
-    <td class="c-hide">${esc(p.stakeholders||"")}</td></tr>`;
+</tr>`;
   let body="";
   if(grouped){ for(const c of cats){ const g=sorted.filter(p=>catOf(p)===c); if(!g.length && (c===NO_CAT || archive)) continue;
-      body+=`<tr class="cathead"><td colspan="6">${esc(c)} <span class="t2">(${g.length})</span></td></tr>`+(g.length?g.map(row).join(""):`<tr><td colspan="6" class="t2">None at the moment.</td></tr>`); } }
+      body+=`<tr class="cathead"><td colspan="4">${esc(c)} <span class="t2">(${g.length})</span></td></tr>`+(g.length?g.map(row).join(""):`<tr><td colspan="4" class="t2">None at the moment.</td></tr>`); } }
   else body=sorted.map(row).join("");
-  return `<section><div class="tbl-wrap cardwrap"><table class="cards"><thead><tr><th>Project</th><th>Status</th><th>Description</th><th>${archive?"Last update":"This week's update"}</th><th>Corp Dev</th><th>Stakeholders</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
+  return `<section><div class="tbl-wrap cardwrap"><table class="cards"><thead><tr><th>Project</th><th>Status</th><th>Description</th><th>${archive?"Last update":"This week's update"}</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
 }
 
 /* Projects: the editable list with filters */
@@ -626,6 +661,7 @@ function projectFormHTML(dr){
     </div>
     <div><h3 class="sec">Links</h3><div id="linkRows">${linkRowsHTML(dr.links)}</div><button type="button" class="btn sm" data-act="add-link">Add link</button>
       <p class="source" style="margin-top:6px">Paste the SharePoint "Copy link" URL. Viewers need SharePoint access to open it.</p></div>
+    ${isNew||!S.reminders.some(r=>r.projectId===p.id)?"":`<div><h3 class="sec">Reminders</h3>${remListHTML(sortTodos(S.reminders.filter(r=>r.projectId===p.id)))}</div>`}
     ${isNew?"":`<div><h3 class="sec">To-dos</h3>${todoListHTML(todos,{showMeeting:true})}
       <div class="addtodo" style="margin-top:8px"><input type="text" id="pt_text" placeholder="Add a to-do for this project" aria-label="New to-do"><input type="text" id="pt_owner" placeholder="Owner" aria-label="Owner" value="${esc(myInitials())}"><input type="date" id="pt_due" aria-label="Due date"><button type="button" class="btn sm primary" data-act="add-ptodo">Add</button></div></div>
     <div><h3 class="sec">History</h3><ul class="mlist hist" id="histList"></ul></div>`}
@@ -646,13 +682,14 @@ function projectFormValues(){
 
 /* To-do editor */
 function todoFormHTML(dr){
-  const isNew=!dr.id; const t = isNew ? (dr.seed||{}) : (dr.orig||S.todos.find(x=>x.id===dr.id)||{});
+  const isNew=!dr.id; const t = isNew ? (dr.seed||{}) : (dr.orig||allTodos().find(x=>x.id===dr.id)||{}); const rem=t.kind==="reminder";
   const projs=[...S.projects].sort((a,b)=>(isOpen(b)-isOpen(a))||String(a.name).localeCompare(String(b.name)));
-  return `${drHead(isNew?"New to-do":"To-do", esc(t.text||"New to-do"), isNew?"":savedLine(t))}
+  return `${drHead(rem?"Reminder":isNew?"New to-do":"To-do", esc(rem?`Follow up with ${t.person||"someone"}`:t.text||"New to-do"), isNew?"":savedLine(t))}
   <form class="drawer-b" id="todoForm" novalidate>
     <div id="drAlert" role="alert"></div>
     <div class="fgrid">
-      <label class="f full">To-do<input type="text" id="f_text" value="${esc(t.text||"")}"></label>
+      ${rem?`<label class="f full">Follow up with<input type="text" id="f_person" value="${esc(t.person||"")}"></label>`:""}
+      <label class="f full">${rem?"About":"To-do"}<input type="text" id="f_text" value="${esc(t.text||"")}"></label>
       <label class="f">Owner <em>(initials)</em><input type="text" id="f_owner" value="${esc(t.owner||"")}" list="ownerList2"><datalist id="ownerList2">${teamInitials().map(i=>`<option value="${esc(i)}">`).join("")}</datalist></label>
       <label class="f">Due<input type="date" id="f_due" value="${esc(t.due||"")}"></label>
       <label class="f full">Project${sel("f_projectId",projs.map(p=>[p.id,p.name+(isOpen(p)?"":` (${p.status})`)]),t.projectId||"","No project")}</label>
@@ -666,7 +703,7 @@ function todoFormHTML(dr){
   <div class="drawer-f">${isNew?"":(dr.confirmDelete?`<span class="over">Delete this to-do?</span><button class="btn danger sm" data-act="del-yes">Delete</button><button class="btn sm" data-act="del-no">Keep</button>`:`<button class="btn danger" data-act="del-ask">Delete</button>`)}
     <span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="save-todo">${isNew?"Add to-do":"Save changes"}</button></div>`;
 }
-function todoFormValues(){ return {text:val("f_text"), owner:val("f_owner").toUpperCase(), due:val("f_due"), projectId:val("f_projectId"), done:!!document.getElementById("f_done")?.checked, notes:val("f_notes")}; }
+function todoFormValues(){ return {...(document.getElementById("f_person")?{person:val("f_person")}:{}), text:val("f_text"), owner:val("f_owner").toUpperCase(), due:val("f_due"), projectId:val("f_projectId"), done:!!document.getElementById("f_done")?.checked, notes:val("f_notes")}; }
 
 /* Meeting snapshot */
 function meetingHTML(dr){
@@ -763,7 +800,7 @@ function makeDb(sb){
 }
 
 function openEditor(kind,id){
-  const rec=(kind==="project"?S.projects:S.todos).find(x=>x.id===id); if(!rec) return;
+  const rec=(kind==="project"?S.projects:allTodos()).find(x=>x.id===id); if(!rec) return;
   S.drawer={kind, id, orig:JSON.parse(JSON.stringify(rec))}; renderDrawer();
   S.drawer.base = kind==="project" ? projectFormValues() : todoFormValues();
 }
@@ -798,7 +835,7 @@ async function saveRecord(kind){
   const read=()=>kind==="project"?projectFormValues():todoFormValues();
   const v=read();
   if(kind==="project"){ if(!v.name){ toast("Give the project a name."); return; } const bad=v.links.find(l=>!safeUrl(l.url)); if(bad){ toast(`"${bad.url}" is not a web address. Paste the full https:// link.`); return; } }
-  else if(!v.text){ toast("Write the to-do first."); return; }
+  else if(!v.text && !v.person){ toast("Write the to-do first."); return; }
   const m=meta();
   if(!dr.id){
     const id=(kind==="project"?"p":"t")+uid();
@@ -845,7 +882,7 @@ async function recreateRecord(){
 }
 async function deleteRecord(){
   const dr=S.drawer; if(!dr||!dr.id) return;
-  if(dr.kind==="project"){ const ts=S.todos.filter(t=>t.projectId===dr.id);
+  if(dr.kind==="project"){ const ts=allTodos().filter(t=>t.projectId===dr.id);
     if(await guard(async()=>{ await S.db.collection("projects").doc(dr.id).delete(); for(const t of ts) await S.db.collection("todos").doc(t.id).delete(); }, "Project deleted")) closeDrawer(); }
   else if(dr.kind==="todo"){ if(await guard(()=>S.db.collection("todos").doc(dr.id).delete(), "To-do deleted")) closeDrawer(); }
   else if(dr.kind==="meeting"){ if(await guard(()=>S.db.collection("meetings").doc(dr.id).delete(), "Snapshot deleted")) closeDrawer(); }
@@ -860,6 +897,12 @@ async function addTodo({text, owner, due, projectId}){
   const lm=latestMeeting();
   return guard(()=>S.db.collection("todos").doc("t"+uid()).set({text, owner:String(owner||"").trim().toUpperCase(), due:due||"", projectId:projectId||"", done:false, notes:"",
     meetingId:"", meetingDate:lm&&lm.date>=addDays(TODAY(),-7)?lm.date:"", createdAt:Date.now(), createdBy:S.meId||"", ...meta()}), "To-do added");
+}
+async function addReminder({person, text, owner, projectId}){
+  person=String(person||"").trim(); text=String(text||"").trim(); if(!person && !text){ toast("Write who to follow up with first."); return false; }
+  const lm=latestMeeting();
+  return guard(()=>S.db.collection("todos").doc("r"+uid()).set({kind:"reminder", person, text, owner:String(owner||"").trim().toUpperCase(), due:"", projectId:projectId||"", done:false, notes:"",
+    meetingId:"", meetingDate:lm&&lm.date>=addDays(TODAY(),-7)?lm.date:"", createdAt:Date.now(), createdBy:S.meId||"", ...meta()}), "Reminder added");
 }
 function snapshotRows(date){
   return S.projects.filter(p=>isOpen(p) || p.closedAt===date).map(p=>({id:p.id, name:p.name, category:p.category||"", quarter:p.quarter||"", status:p.status||"Active", stage:p.stage||"",
@@ -940,7 +983,7 @@ function claudeInput(date, transcript){
     .map(p=>({name:p.name, category:p.category, description:String(p.description||"").slice(0,300), corrected:!!p.categoryCorrected}));
   return {meetingDate:date, transcript,
     projects:S.projects.filter(isOpen).map(p=>({id:p.id, name:p.name, category:p.category||"", quarter:p.quarter||"", description:p.description||"", stakeholders:p.stakeholders||"", corpDev:p.corpDev||"", status:p.status||"Active", update:p.update||"", stage:p.stage||""})),
-    examples, openTodos:S.todos.filter(t=>!t.done).map(t=>({id:t.id, text:t.text, owner:t.owner||"", projectId:t.projectId||"", due:t.due||""})), team};
+    examples, openTodos:allTodos().filter(t=>!t.done).map(t=>({id:t.id, text:t.kind==="reminder"?`Reminder: follow up with ${t.person||"someone"}${t.text?`: ${t.text}`:""}`:t.text, owner:t.owner||"", projectId:t.projectId||"", due:t.due||""})), team};
 }
 async function readWithClaude(){
   const dr=S.drawer; dr.date=val("f_mdate"); dr.text=document.getElementById("f_ttext").value.trim();
@@ -964,6 +1007,7 @@ function prepareReview(p){
     n:(p.new_projects||[]).map(x=>({...x, take:true, suggested:x.category, catOk:auto})),
     a:(p.archive||[]).map(x=>({...x, take:true})),
     t:(p.todos||[]).map(x=>({...x, take:true})),
+    r:(p.reminders||[]).map(x=>({...x, take:true})),
     d:(p.todos_done||[]).map(x=>({...x, take:true}))};
 }
 function reviewHTML(dr){
@@ -974,7 +1018,7 @@ function reviewHTML(dr){
   const selr=(k,i,f,opts,blank)=>`<select data-rv="${k}.${i}.${f}" aria-label="${esc(f)}">${blank!=null?`<option value="">${esc(blank)}</option>`:""}${opts.map(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; return `<option value="${esc(v)}"${v===rv[k][i][f]?" selected":""}>${esc(l)}</option>`; }).join("")}</select>`;
   const pname=id=>(projById(id)||{}).name||"A project";
   const projOpts=[...S.projects.filter(isOpen).map(p=>[p.id,p.name]), ...rv.n.filter(n=>n.take&&n.name).map(n=>[n.name,n.name+" (new)"])];
-  const total=["u","n","a","t","d"].reduce((s,k)=>s+rv[k].filter(x=>x.take).length,0);
+  const total=["u","n","a","t","r","d"].reduce((s,k)=>s+rv[k].filter(x=>x.take).length,0);
   const sec=(title,n,inner)=>`<div><h3 class="sec">${title} <span class="n">${n}</span></h3>${n?`<div style="display:flex;flex-direction:column;gap:10px">${inner}</div>`:`<p class="t2">None.</p>`}</div>`;
   return `<div class="drawer-b" id="rvBody">
     <div class="banner"><span>Meeting on <b>${esc(fmtDate(dr.date))}</b>. Untick anything you don't want, edit anything that's off, then save. ${rv.summary?`<br>${esc(rv.summary)}`:""}</span></div>
@@ -1001,7 +1045,10 @@ function reviewHTML(dr){
     ${sec("To-dos for the week", rv.t.length, `<div>${rv.t.map((t,i)=>`<div class="rvtodo${t.take?"":" off"}"><input type="checkbox" data-rv="t.${i}.take"${t.take?" checked":""} aria-label="Add this to-do">${inp("t",i,"text","To-do")}${inp("t",i,"owner","Owner")}
         <select data-rv="t.${i}.project_ref" aria-label="Project"><option value="">No project</option>${projOpts.map(([v,l])=>`<option value="${esc(v)}"${v===t.project_ref?" selected":""}>${esc(l)}</option>`).join("")}</select>${inp("t",i,"due","Due","date")}
         ${t.quote?`<div class="q">"${esc(t.quote)}"</div>`:""}</div>`).join("")}</div>`)}
-    ${sec("Open to-dos the meeting said are done", rv.d.length, rv.d.map((d,i)=>{ const t=S.todos.find(x=>x.id===d.todo_id)||{}; return `<div class="rv a${d.take?"":" off"}"><div class="rh">${box("d",i,`Mark done: ${esc(t.text||"to-do")}`)}</div>${d.reason?`<div class="why">${esc(d.reason)}</div>`:""}</div>`; }).join(""))}
+    ${sec("Reminders: people to follow up with", rv.r.length, `<div>${rv.r.map((t,i)=>`<div class="rvrem${t.take?"":" off"}"><input type="checkbox" data-rv="r.${i}.take"${t.take?" checked":""} aria-label="Add this reminder">${inp("r",i,"person","Follow up with")}${inp("r",i,"about","About what")}${inp("r",i,"owner","Who")}
+        <select data-rv="r.${i}.project_ref" aria-label="Project"><option value="">No project</option>${projOpts.map(([v,l])=>`<option value="${esc(v)}"${v===t.project_ref?" selected":""}>${esc(l)}</option>`).join("")}</select>${inp("r",i,"due","By","date")}
+        ${t.quote?`<div class="q">"${esc(t.quote)}"</div>`:""}</div>`).join("")}</div>`)}
+    ${sec("Open to-dos and reminders the meeting said are done", rv.d.length, rv.d.map((d,i)=>{ const t=allTodos().find(x=>x.id===d.todo_id)||{}; return `<div class="rv a${d.take?"":" off"}"><div class="rh">${box("d",i,`Mark done: ${esc(t.kind==="reminder"?`follow up with ${t.person||""}${t.text?`: ${t.text}`:""}`:t.text||"to-do")}`)}</div>${d.reason?`<div class="why">${esc(d.reason)}</div>`:""}</div>`; }).join(""))}
   </div>
   <div class="drawer-f"><button class="btn" data-act="tr-back">Back</button><span class="sp"></span><span class="t2">${total} change${total===1?"":"s"} selected</span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="tr-save">Save and record the meeting</button></div>`;
 }
@@ -1026,6 +1073,10 @@ async function applyReview(){
     for(const t of rv.t.filter(x=>x.take&&String(x.text).trim())){
       const pid=projById(t.project_ref)?t.project_ref:(nameToId[t.project_ref]||"");
       await S.db.collection("todos").doc("t"+uid()).set({text:t.text.trim(), owner:String(t.owner||"").trim().toUpperCase(), due:t.due||"", projectId:pid, done:false, notes:"", quote:t.quote||"",
+        meetingId:mid, meetingDate:date, createdAt:Date.now(), createdBy:S.meId||"", ...m},{quiet:true}); made++; }
+    for(const t of rv.r.filter(x=>x.take&&(String(x.person).trim()||String(x.about).trim()))){
+      const pid=projById(t.project_ref)?t.project_ref:(nameToId[t.project_ref]||"");
+      await S.db.collection("todos").doc("r"+uid()).set({kind:"reminder", person:String(t.person||"").trim(), text:String(t.about||"").trim(), owner:String(t.owner||"").trim().toUpperCase(), due:t.due||"", projectId:pid, done:false, notes:"", quote:t.quote||"",
         meetingId:mid, meetingDate:date, createdAt:Date.now(), createdBy:S.meId||"", ...m},{quiet:true}); made++; }
     for(const d of rv.d.filter(x=>x.take)){ try{ await S.db.collection("todos").doc(d.todo_id).update({done:true, doneAt:date, ...m},{quiet:true}); made++; }catch(e){ if(!(e&&e.code==="not_found")) throw e; } }
     await refetch("projects"); await refetch("todos");
@@ -1121,7 +1172,8 @@ async function exportWorkbook(){
   X.utils.book_append_sheet(wb, sheet([["","Project","Description","Stakeholders","Corp Dev","Status",`${us(label)} Update`], ...grouped(S.projects.filter(isOpen))],[28,30,50,22,16,10,60]), "Current");
   X.utils.book_append_sheet(wb, sheet([["Owner","To-do","Project","Due","Done","From meeting"], ...sortTodos([...S.todos]).map(t=>[t.owner||"", t.text, (projById(t.projectId)||{}).name||"", t.due||"", t.done?"Yes":"", t.meetingDate||""])],[8,60,30,12,6,14]), "To-dos");
   X.utils.book_append_sheet(wb, sheet([["Project","Description","Stakeholders","Corp Dev","Status","Last update","Closed"], ...S.projects.filter(p=>!isOpen(p)).sort((a,b)=>String(b.closedAt||"").localeCompare(String(a.closedAt||""))).map(p=>[p.name,p.description||"",p.stakeholders||"",p.corpDev||"",p.status,p.update||"",p.closedAt||""])],[30,50,22,16,10,60,12]), "Old Projects");
-  const used=new Set(["Current","To-dos","Old Projects"]);
+  X.utils.book_append_sheet(wb, sheet([["Who","Follow up with","About","Project","By","Done","From meeting"], ...sortTodos([...S.reminders]).map(t=>[t.owner||"", t.person||"", t.text||"", (projById(t.projectId)||{}).name||"", t.due||"", t.done?"Yes":"", t.meetingDate||""])],[8,26,50,30,12,6,14]), "Reminders");
+  const used=new Set(["Current","To-dos","Reminders","Old Projects"]);
   for(const mt of [...S.meetings].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,26)){
     const [y,mo,da]=mt.date.split("-"); let nm=`${mo}.${da}.${y.slice(2)}`; if(used.has(nm)) continue; used.add(nm);
     X.utils.book_append_sheet(wb, sheet([["","Project","Description","Stakeholders","Corp Dev","Status",`${us(mt.date)} Update`], ...grouped((mt.snapshot||[]).map(s=>({...s})))],[28,30,50,22,16,10,60]), nm);
@@ -1192,6 +1244,7 @@ document.addEventListener("keydown", e=>{
 document.addEventListener("submit", async e=>{ e.preventDefault();
   if(e.target.id==="loginForm"){ doLogin(); return; }
   if(e.target.id==="pwForm"){ savePassword(); return; }
+  if(e.target.id==="addRemForm"){ if(await addReminder({person:val("nr_person"), text:val("nr_text"), owner:val("nr_owner")})){ const x=document.getElementById("nr_person"); if(x){ x.value=""; x.focus(); } } return; }
   if(e.target.id==="addTodoForm"){ if(await addTodo({text:val("nt_text"), owner:val("nt_owner"), due:val("nt_due")})){ const x=document.getElementById("nt_text"); if(x){ x.value=""; x.focus(); } } }
 });
 document.addEventListener("input", e=>{
@@ -1214,7 +1267,8 @@ document.addEventListener("change", async e=>{
 async function refetch(table){
   const {data, error}=await S.sb.from(table).select("id,doc,updated_at,updated_by");
   if(error){ if(!S.loaded[table]) toast("Couldn't load the tracker: "+error.message); return; }
-  S[table]=(data||[]).map(r=>({...(r.doc||{}), id:r.id, _v:r.updated_at, _by:r.updated_by}));
+  const rows=(data||[]).map(r=>({...(r.doc||{}), id:r.id, _v:r.updated_at, _by:r.updated_by}));
+  if(table==="todos"){ S.reminders=rows.filter(r=>r.kind==="reminder"); S.todos=rows.filter(r=>r.kind!=="reminder"); } else S[table]=rows;
   if(table==="projects") S.projects.forEach(p=>{ if(!STATUSES.includes(p.status)) p.status="Active"; });
   S.loaded[table]=true; if(TABLES.every(t=>S.loaded[t])) clearTimeout(startData.timer);
   if(table==="projects" && S.changes && !S.changes.loading) S.changes=null;

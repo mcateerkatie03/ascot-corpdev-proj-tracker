@@ -49,7 +49,8 @@ What to propose:
 - new_projects: projects discussed that aren't on the list, with status Active or Pending. Pick the best category and say why in category_reason (one short sentence naming the deciding fact). Check the existing list first so you don't propose a duplicate under a slightly different name.
 - archive: projects the meeting said are finished (status Completed) or killed, dropped or to be removed without finishing (status Dropped).
 - todos: concrete action items for the coming week: who does what, by when. owner is the person's initials from the team list when they are on the team, otherwise their name. due is YYYY-MM-DD when a date or day was said ("by Friday" is the Friday after the meeting date), otherwise "". project_ref is the id of an existing project, the exact name of a project in new_projects, or "". quote is a short phrase from the transcript that supports it.
-- todos_done: open to-dos (listed in the user message) that the meeting said are done.
+- reminders: people to follow up with, so the team remembers to get in touch. Examples: "we need to schedule a meeting with B. Sample" (person "B. Sample", about "Schedule a meeting"), "I need to check with C. Person when he's back in New York" (person "C. Person", about "Check when he's back in New York"). person is the name as said (with company if mentioned); about is a short phrase on what to follow up on; owner, project_ref, due and quote work as for todos. An item that is mainly about contacting someone goes in reminders, not todos; don't list it twice.
+- todos_done: open to-dos and reminders (listed in the user message) that the meeting said are done.
 - summary: two or three plain sentences on what the meeting covered.
 
 Rules:
@@ -74,6 +75,7 @@ export const SCHEMA = obj({
   }) },
   archive: { type: "array", items: obj({ project_id: str, status: { type: "string", enum: ["Completed", "Dropped"] }, reason: str }) },
   todos: { type: "array", items: obj({ text: str, owner: str, project_ref: str, due: str, quote: str }) },
+  reminders: { type: "array", items: obj({ person: str, about: str, owner: str, project_ref: str, due: str, quote: str }) },
   todos_done: { type: "array", items: obj({ todo_id: str, reason: str }) },
 });
 
@@ -113,7 +115,7 @@ export function userMessage(i: Input): string {
     `Team (name and initials): ${JSON.stringify(i.team)}`,
     `Current project list (JSON):\n${JSON.stringify(projects)}`,
     `How the team has categorised projects before (JSON):\n${JSON.stringify(examples)}`,
-    `Open to-dos (JSON):\n${JSON.stringify(i.openTodos)}`,
+    `Open to-dos and reminders (JSON):\n${JSON.stringify(i.openTodos)}`,
     `Transcript:\n<transcript>\n${i.transcript}\n</transcript>`,
   ].join("\n\n");
 }
@@ -124,6 +126,7 @@ export type Proposal = {
   new_projects: { name: string; category: string; category_reason: string; quarter: string; description: string; stakeholders: string; corp_dev: string; update: string; status: string; stage: string }[];
   archive: { project_id: string; status: string; reason: string }[];
   todos: { text: string; owner: string; project_ref: string; due: string; quote: string }[];
+  reminders: { person: string; about: string; owner: string; project_ref: string; due: string; quote: string }[];
   todos_done: { todo_id: string; reason: string }[];
 };
 
@@ -161,5 +164,10 @@ export function cleanProposal(raw: unknown, i: Input): Proposal {
   }).filter((t) => once("t:" + t.text.toLowerCase()));
   const todos_done = list(r.todos_done).filter((d) => todoIds.has(String(d.todo_id)) && once("d:" + d.todo_id))
     .map((d) => ({ todo_id: String(d.todo_id), reason: clip(d.reason, 300) }));
-  return { summary: clip(r.summary, 2000), project_updates, new_projects, archive, todos, todos_done };
+  const reminders = list(r.reminders).filter((m) => String(m.person ?? "").trim() || String(m.about ?? "").trim()).map((m) => {
+    const ref = String(m.project_ref ?? "").trim();
+    return { person: clip(m.person, 120).trim(), about: clip(m.about, 400).trim(), owner: clip(m.owner, 60).trim(), due: date(m.due), quote: clip(m.quote, 300),
+      project_ref: ids.has(ref) || newNames.has(ref.toLowerCase()) ? ref : "" };
+  }).filter((m) => once("r:" + (m.person + "|" + m.about).toLowerCase()));
+  return { summary: clip(r.summary, 2000), project_updates, new_projects, archive, todos, reminders, todos_done };
 }

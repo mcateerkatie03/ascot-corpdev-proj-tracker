@@ -18,11 +18,13 @@ const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "
 
 export type Digest = {
   subject: string; text: string; html: string;
-  counts: { open: number; pending: number; overdue: number; dueThisWeek: number; quiet: number; changes: number };
+  counts: { open: number; pending: number; overdue: number; dueThisWeek: number; quiet: number; reminders: number; changes: number };
 };
 
 export function buildDigest(input: { projects: Doc[]; todos: Doc[]; history?: HistoryRow[] | null; now: number; siteUrl?: string }): Digest {
-  const { projects, todos, now } = input;
+  const { projects, now } = input;
+  const todos = input.todos.filter((t) => t.kind !== "reminder");
+  const reminders = input.todos.filter((t) => t.kind === "reminder" && !t.done);
   const today = iso(now);
   const site = (input.siteUrl ?? "").replace(/\/+$/, "");
   const link = (kind: string, id: string) => (site ? `${site}/#${kind}/${encodeURIComponent(id)}` : "");
@@ -46,7 +48,7 @@ export function buildDigest(input: { projects: Doc[]; todos: Doc[]; history?: Hi
     else if (r.op === "update" && r.changes?.status && r.changes.status.from !== r.changes.status.to) changes.push(`${n}: ${r.changes.status.from ?? "Active"} to ${r.changes.status.to ?? "Active"}`);
   }
 
-  const counts = { open: open.length, pending: pending.length, overdue: overdue.length, dueThisWeek: dueThisWeek.length, quiet: quiet.length, changes: changes.length };
+  const counts = { open: open.length, pending: pending.length, overdue: overdue.length, dueThisWeek: dueThisWeek.length, quiet: quiet.length, reminders: reminders.length, changes: changes.length };
   const subject = `Corp Dev weekly: ${open.length} open project${open.length === 1 ? "" : "s"}, ${dueThisWeek.length} to-do${dueThisWeek.length === 1 ? "" : "s"} due this week` +
     (overdue.length ? `, ${overdue.length} overdue` : "");
 
@@ -55,6 +57,7 @@ export function buildDigest(input: { projects: Doc[]; todos: Doc[]; history?: Hi
   const sections: { title: string; items: Item[]; empty: string }[] = [
     { title: "Overdue to-dos", empty: "None.", items: overdue.map((t) => ({ text: todoLine(t), href: link("todo", t.id) })) },
     { title: "To-dos due this week", empty: "None.", items: dueThisWeek.map((t) => ({ text: todoLine(t), href: link("todo", t.id) })) },
+    { title: "Reminders: people to follow up with", empty: "None.", items: reminders.map((t) => ({ text: `${t.owner ? `${t.owner}: ` : ""}follow up with ${t.person || "someone"}${t.text ? `, ${t.text}` : ""}${t.projectId && name(t.projectId) ? ` (${name(t.projectId)})` : ""}`, href: link("todo", t.id) })) },
     { title: "Pending projects", empty: "None.", items: pending.map((p) => ({ text: `${p.name}${p.update ? `: ${String(p.update).split("\n")[0].replace(/^-\s*/, "")}` : ""}`, href: link("project", p.id) })) },
     { title: `Quiet: no update in ${QUIET_DAYS / 7} weeks`, empty: "None.", items: quiet.map((p) => ({ text: `${p.name}: last update ${fmtDate(lastUpdate(p))}`, href: link("project", p.id) })) },
   ];

@@ -3,11 +3,12 @@
 The Corporate Development team's weekly project list, kept up to date from the transcripts of the weekly Teams meeting. Styled on the Ascot PPT template.
 
 - **This week:** the dashboard. Tiles for active and pending projects and open to-dos, the week's to-dos, what changed, and every open project grouped by category with its description, status and this week's update.
+- **Reminders:** a panel beside the dashboard's project table listing people to follow up with ("schedule a meeting with…", "check with… when he's back in New York"). Claude picks them out of each transcript; you can add or tick them off by hand.
 - **Projects:** the whole list, filterable by status, category and Corp Dev initials. Open a project to edit it, add links and to-dos, or see its history.
 - **To-dos:** the week's action items with owner, project and due date. Unfinished ones carry forward until they're ticked off. Filters for *Mine*, *Overdue* and *Due this week*.
 - **Archive:** completed and dropped projects (the workbook's Old Projects tab). Any project can be restored.
 - **Meetings:** one entry per weekly meeting with a snapshot of the list as it stood, like the dated tabs in the workbook.
-- **Import transcript:** drop in the meeting transcript (.docx or .vtt from Teams, or pasted text). Claude proposes status changes, new updates, new projects with a suggested category, projects to take off the list, new to-dos and to-dos that are done. You review, edit and tick what to keep, then save. That records the meeting.
+- **Import transcript:** drop in the meeting transcript (.docx or .vtt from Teams, or pasted text). Claude proposes status changes, new updates, new projects with a suggested category, projects to take off the list, new to-dos, people to follow up with, and to-dos or reminders that are done. You review, edit and tick what to keep, then save. That records the meeting.
 - **Import workbook / Export Excel:** bring in the existing project list once; download the current list any time in the same layout (Current, To-dos, Old Projects and one tab per week).
 
 **Statuses.** *Active*: ongoing. *Pending*: no update, or waiting on someone else. *Completed*: finished or sent out, comes off the list. *Dropped*: started but taken off the list without being completed. Projects under External Growth Initiatives can also carry an optional deal stage (Screening, NDA signed, LOI, Diligence, Closed, On hold, Dead).

@@ -22,6 +22,7 @@ const seed = [
   ["todos", "t1", { text: "Send draft to A. Example", owner: "ZT", projectId: "p1", due: dd(2), done: false, meetingId: "m" + LAST, meetingDate: LAST, createdAt: now - 4 * DAY }],
   ["todos", "t2", { text: "Chase partner for proposal", owner: "WL", projectId: "p2", due: dd(-1), done: false, meetingId: "m" + PREV, meetingDate: PREV, createdAt: now - 11 * DAY }],
   ["todos", "t3", { text: "Book room", owner: "ZT", projectId: "p4", due: dd(20), done: false, meetingDate: LAST, createdAt: now - 4 * DAY }],
+  ["todos", "r1", { kind: "reminder", person: "B. Sample", text: "Schedule a meeting", owner: "WL", projectId: "p3", due: "", done: false, meetingId: "m" + PREV, meetingDate: PREV, createdAt: now - 11 * DAY }],
   ["meetings", "m" + LAST, { date: LAST, title: "Weekly meeting", summary: "Covered the sample projects.", source: "transcript", snapshot: [{ id: "p1", name: "Harbor Review", category: "Portfolio Growth Initiatives", status: "Active", update: "- Draft out", description: "Review of the internal operating model" }] }],
   ["meetings", "m" + PREV, { date: PREV, title: "Weekly meeting", source: "import", snapshot: [] }],
 ];
@@ -39,7 +40,8 @@ const PROPOSAL = {
     { text: "Circulate Harbor draft", owner: "ZT", project_ref: "p1", due: "", quote: "" },
     { text: "Unwanted item", owner: "", project_ref: "", due: "", quote: "" },
   ],
-  todos_done: [{ todo_id: "t1", reason: "Sent" }],
+  reminders: [{ person: "C. Person", about: "Check when he's back in New York", owner: "ZT", project_ref: "p1", due: "", quote: "check with C. Person" }],
+  todos_done: [{ todo_id: "t1", reason: "Sent" }, { todo_id: "r1", reason: "Meeting booked" }],
 };
 
 async function page(b, { vp = { width: 1280, height: 900 }, seedRows = seed, hash = "#week", onFn } = {}) {
@@ -83,6 +85,21 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("carried-forward label", (await p.textContent('.todo[data-id="t2"]')).includes("Carried from"));
   ok("overdue marked", !!(await p.$('.todo[data-id="t2"] .due.over')));
   ok("tab badge counts my to-dos", (await p.textContent("#tagTodos")) === "2 yours");
+
+  // reminders panel beside the table
+  ok("reminders panel beside the table", (await p.$$(".weekgrid > aside.reminders")).length === 1);
+  ok("reminder shows person and topic", (await p.textContent('.reminders .todo[data-id="r1"]')).includes("B. Sample: Schedule a meeting"));
+  ok("reminders not counted as to-dos", tiles[2] === "3" && !(await p.$('section.cols .todo[data-id="r1"]')));
+  ok("corp dev and stakeholders columns removed", (await p.$$eval("thead th", x => x.map(e => e.textContent).join("|"))) === "Project|Status|Description|This week's update");
+  await p.fill("#nr_person", "D. Example"); await p.fill("#nr_text", "Ask about the renewal"); await p.press("#nr_text", "Enter"); await p.waitForTimeout(200);
+  const rNew = (await docs(p, "todos")).find(t => t.person === "D. Example");
+  ok("reminder added from the panel", rNew && rNew.kind === "reminder" && rNew.text === "Ask about the renewal" && rNew.owner === "ZT", rNew);
+  await p.click(`.reminders .todo[data-id="${rNew.id}"] .tx`); await p.waitForSelector("#todoForm");
+  ok("reminder opens with the person field", (await p.inputValue("#f_person")) === "D. Example");
+  await p.fill("#f_person", "D. Example (Sample Co)"); await p.click('.drawer-f [data-act="save-todo"]'); await p.waitForTimeout(200);
+  ok("reminder edited", (await doc(p, "todos", rNew.id)).person === "D. Example (Sample Co)");
+  await p.click(`.reminders .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(200);
+  ok("reminder ticked off leaves the panel", (await doc(p, "todos", rNew.id)).done === true && !(await p.$(`.reminders .todo[data-id="${rNew.id}"]`)));
 
   // tick a to-do
   await p.click('.todo[data-id="t1"] input[type=checkbox]'); await p.waitForTimeout(200);
@@ -146,8 +163,8 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   await p.waitForSelector("#rvBody");
   ok("request carries open projects only", sent && sent.projects.map(x => x.id).sort().join(",") === "p1,p2,p3,p4", sent && sent.projects.map(x => x.id));
   ok("request carries categorised examples incl. archived", sent.examples.some(e => e.name === "Old Sample Deal"));
-  ok("request carries open to-dos and team initials", sent.openTodos.length === 3 && sent.team.some(t => t.initials === "WL"));
-  ok("review lists all sections", (await p.$$eval("#rvBody h3.sec", x => x.map(e => e.textContent.replace(/\s*\d+$/, "").trim()).join("|"))) === "Project updates|New projects|Take off the list|To-dos for the week|Open to-dos the meeting said are done");
+  ok("request carries open to-dos, reminders and team initials", sent.openTodos.length === 4 && sent.openTodos.some(t => t.text === "Reminder: follow up with B. Sample: Schedule a meeting") && sent.team.some(t => t.initials === "WL"), sent.openTodos);
+  ok("review lists all sections", (await p.$$eval("#rvBody h3.sec", x => x.map(e => e.textContent.replace(/\s*\d+$/, "").trim()).join("|"))) === "Project updates|New projects|Take off the list|To-dos for the week|Reminders: people to follow up with|Open to-dos and reminders the meeting said are done");
   ok("old update shown for comparison", (await p.textContent("#rvBody .rv .old")).includes("Draft out"));
   ok("Claude's category reason shown", (await p.textContent("#rvBody")).includes("Minority stake in an external MGA"));
   await p.uncheck('[data-rv="t.2.take"]');
@@ -165,6 +182,8 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("to-do linked to the new project", T.some(t => t.text === "Review Kestrel teaser" && t.projectId === kes.id && t.meetingId === "m" + dd(0)));
   ok("unticked to-do not saved", !T.some(t => t.text === "Unwanted item"));
   ok("done to-do marked", T.find(t => t.id === "t1").done === true);
+  ok("reminder from the transcript saved", T.some(t => t.kind === "reminder" && t.person === "C. Person" && t.text === "Check when he's back in New York" && t.projectId === "p1" && t.meetingId === "m" + dd(0)));
+  ok("reminder the meeting closed is done", T.find(t => t.id === "r1").done === true);
   const mt = M.find(m => m.id === "m" + dd(0));
   ok("meeting recorded with snapshot incl. the dropped project", mt && mt.summary === "Sample summary of the meeting." && mt.snapshot.some(s => s.id === "p2" && s.status === "Dropped") && mt.snapshot.some(s => s.name === "Project Kestrel"), mt);
   await p.waitForTimeout(200);
@@ -219,7 +238,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   const fp = path.join(OUT, dl.suggestedFilename()); await dl.saveAs(fp);
   const back = XLSX.readFile(fp);
   ok("export file name", /^Corp_Dev_Project_List_As_of_11\.02\.26\.xlsx$/.test(dl.suggestedFilename()), dl.suggestedFilename());
-  ok("export sheets", back.SheetNames.join(",") === "Current,To-dos,Old Projects,11.02.26,10.27.26", back.SheetNames);
+  ok("export sheets", back.SheetNames.join(",") === "Current,To-dos,Old Projects,Reminders,11.02.26,10.27.26", back.SheetNames);
   const curBack = XLSX.utils.sheet_to_json(back.Sheets.Current, { header: 1, defval: "" });
   ok("export keeps the empty board category heading", curBack.some(r => r[0] === "Quarterly Board Updates"));
   // re-import the export: same projects are skipped
@@ -232,7 +251,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
 
   // ---- To-dos page and phone layout
   p = await page(b, { hash: "#todos" });
-  ok("todos default open", (await p.$$eval(".todo", x => x.length)) === 3);
+  ok("todos default open, reminders not listed", (await p.$$eval(".todo", x => x.length)) === 3);
   await p.click('.fchip[data-act="tf"][data-v="mine"]');
   ok("mine filter", (await p.$$eval(".todo", x => x.map(e => e.dataset.id).join(","))) === "t1,t3");
   await p.fill("#nt_text", "New sample task"); await p.press("#nt_text", "Enter"); await p.waitForTimeout(200);

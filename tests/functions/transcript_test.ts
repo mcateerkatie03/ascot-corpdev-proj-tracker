@@ -63,6 +63,12 @@ const raw = {
     { text: "review teaser", owner: "WL", project_ref: "", due: "", quote: "" },
     { text: "Other", owner: "", project_ref: "made up", due: "Friday", quote: "" },
   ],
+  reminders: [
+    { person: "B. Sample", about: "Schedule a meeting", owner: "WL", project_ref: "Kestrel", due: "", quote: "we need to schedule a meeting with B. Sample" },
+    { person: "b. sample", about: "schedule a meeting", owner: "", project_ref: "", due: "", quote: "" },
+    { person: "", about: "", owner: "ZT", project_ref: "", due: "", quote: "" },
+    { person: "C. Person", about: "Check when he's back in New York", owner: "ZT", project_ref: "nope", due: "soon", quote: "" },
+  ],
   todos_done: [{ todo_id: "t1", reason: "" }, { todo_id: "t9", reason: "" }],
 };
 const c = cleanProposal(raw, input);
@@ -76,6 +82,9 @@ ok("to-do linked to a new project by name", c.todos[0].project_ref === "Kestrel"
 ok("duplicate to-do dropped", c.todos.length === 2);
 ok("unknown project ref and bad date cleared", c.todos[1].project_ref === "" && c.todos[1].due === "");
 ok("done list keeps known to-dos only", c.todos_done.length === 1 && c.todos_done[0].todo_id === "t1");
-ok("garbage answer gives empty proposal", JSON.stringify(cleanProposal(null, input)) === JSON.stringify({ summary: "", project_updates: [], new_projects: [], archive: [], todos: [], todos_done: [] }));
+ok("reminders: duplicates and empty ones dropped", c.reminders.length === 2 && c.reminders[0].person === "B. Sample" && c.reminders[0].project_ref === "Kestrel", c.reminders);
+ok("reminders: unknown project and bad date cleared", c.reminders[1].project_ref === "" && c.reminders[1].due === "");
+ok("system prompt explains reminders", /reminders: people to follow up with/.test(SYSTEM));
+ok("garbage answer gives empty proposal", JSON.stringify(cleanProposal(null, input)) === JSON.stringify({ summary: "", project_updates: [], new_projects: [], archive: [], todos: [], reminders: [], todos_done: [] }));
 
 console.log(`${pass} passed, ${fail} failed`); if (fail) Deno.exit(1);
