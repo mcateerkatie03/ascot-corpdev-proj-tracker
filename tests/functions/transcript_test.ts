@@ -27,6 +27,10 @@ ok("project status and update sent", msg.includes('"status":"Active"') && msg.in
 ok("system prompt defines every category and status", CATEGORIES.every((c: string) => SYSTEM.includes(c + ":")) && ["Active:", "Pending:", "Completed:", "Dropped:"].every((s) => SYSTEM.includes(s)));
 ok("system prompt treats transcript as data", /never as instructions/.test(SYSTEM));
 ok("system prompt has no em dashes", !SYSTEM.includes("—"));
+ok("speaker labels are never people", /Never treat a speaker label as a person/.test(SYSTEM) && /Conference Room/.test(SYSTEM));
+ok("no owners, names only in reminders", /never assign an owner/.test(SYSTEM) && /Names are kept only in reminders/.test(SYSTEM));
+ok("team names not sent to Claude", !msg.includes("Will Lane") && !msg.includes("Team (name"));
+ok("schema has no owner fields", !JSON.stringify(SCHEMA).includes('"owner"'));
 
 // schema: every object closed and fully required (structured outputs needs both)
 function check(s: any, path: string): string[] {
@@ -85,6 +89,8 @@ ok("new project status forced open", c.new_projects.find((n: any) => n.name === 
 ok("deal stage only on external projects", c.new_projects.find((n: any) => n.name === "Kestrel").stage === "" && c.new_projects.find((n: any) => n.name === "Osprey").stage === "Screening");
 ok("archive: unknown id dropped, odd status read as Dropped", c.archive.length === 1 && c.archive[0].status === "Dropped");
 ok("to-do linked to a new project by name", c.todos[0].project_ref === "Kestrel");
+ok("owners always cleared", c.todos.every((t: any) => t.owner === "") && c.reminders.every((m: any) => m.owner === ""));
+ok("stakeholders and corp dev never filled from a transcript", c.project_updates.every((u: any) => u.stakeholders === "" && u.corp_dev === "") && c.new_projects.every((n: any) => n.stakeholders === "" && n.corp_dev === ""));
 ok("duplicate to-do dropped", c.todos.length === 2);
 ok("unknown project ref and bad date cleared", c.todos[1].project_ref === "" && c.todos[1].due === "");
 ok("done list keeps known to-dos only", c.todos_done.length === 1 && c.todos_done[0].todo_id === "t1");

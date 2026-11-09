@@ -119,7 +119,7 @@ footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-bl
 .addrem #nr_person,.addrem #nr_text{grid-column:1/-1}
 .addrem .btn{justify-content:center}
 @media (max-width:1100px){.weekgrid{grid-template-columns:1fr}.reminders{position:static}}
-.rvrem{display:grid;grid-template-columns:24px minmax(0,1fr) minmax(0,1.5fr) 70px minmax(0,1.1fr) 140px;gap:6px;align-items:start;padding:6px 0;border-bottom:1px solid var(--grid)}
+.rvrem{display:grid;grid-template-columns:24px minmax(0,1fr) minmax(0,1.5fr) minmax(0,1.1fr) 140px;gap:6px;align-items:start;padding:6px 0;border-bottom:1px solid var(--grid)}
 .rvrem .q{grid-column:2/-1;font-size:11px;color:var(--muted);font-style:italic;margin-top:-2px}
 @media (max-width:700px){.rvrem{grid-template-columns:24px 1fr 1fr}.rvrem .q{grid-column:1/-1}}
 .todo{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px 10px;align-items:start;padding:9px 0;border-bottom:1px solid var(--grid)}
@@ -248,7 +248,7 @@ label.chk input{margin-top:3px}
 .rvgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .rvgrid .full{grid-column:1/-1}
 @media (max-width:700px){.rvgrid{grid-template-columns:1fr}}
-.rvtodo{display:grid;grid-template-columns:24px minmax(0,2fr) 80px minmax(0,1.3fr) 140px;gap:6px;align-items:start;padding:6px 0;border-bottom:1px solid var(--grid)}
+.rvtodo{display:grid;grid-template-columns:24px minmax(0,2fr) minmax(0,1.3fr) 140px;gap:6px;align-items:start;padding:6px 0;border-bottom:1px solid var(--grid)}
 .rvtodo .q{grid-column:2/-1;font-size:11px;color:var(--muted);font-style:italic;margin-top:-2px}
 @media (max-width:700px){.rvtodo{grid-template-columns:24px 1fr 1fr}.rvtodo .q{grid-column:1/-1}}
 .busy{display:flex;gap:12px;align-items:center;background:var(--tile);padding:14px}
@@ -1113,7 +1113,7 @@ function reviewHTML(dr){
           <label class="f">Status${selr("u",i,"status",OPEN.map(s=>[s,s]),`No change (${p.status||"Active"})`)}</label>
           ${ext?`<label class="f">Deal stage${selr("u",i,"stage",STAGES,`No change${p.stage?` (${p.stage})`:""}`)}</label>`:""}
           ${u.description?`<label class="f full">New description${ta("u",i,"description",2)}</label>`:""}
-          ${u.corp_dev?`<label class="f">Corp Dev${inp("u",i,"corp_dev")}</label>`:""}${u.stakeholders?`<label class="f">Stakeholders${inp("u",i,"stakeholders")}</label>`:""}</div>
+</div>
         ${u.reason?`<div class="why">${esc(u.reason)}</div>`:""}</div>`; }).join(""))}
     ${sec("New projects", rv.n.length, rv.n.map((n,i)=>`<div class="rv n${n.take?"":" off"}"><div class="rh">${box("n",i,"Add as a new project")}</div>
         <div class="rvgrid"><label class="f full">Project${inp("n",i,"name","Project name")}</label>
@@ -1123,13 +1123,12 @@ function reviewHTML(dr){
           <div class="full why">Claude suggested <b>${esc(n.suggested)}</b>${n.category_reason?`: ${esc(n.category_reason)}`:""}</div>
           ${auto?"":`<label class="chk full"><input type="checkbox" data-rv="n.${i}.catOk"${n.catOk?" checked":""}> The category is right</label>`}
           <label class="f full">Description${ta("n",i,"description",2)}</label>
-          <label class="f">Corp Dev${inp("n",i,"corp_dev","WL / ZT")}</label><label class="f">Stakeholders${inp("n",i,"stakeholders")}</label><span></span>
           <label class="f full">Update${ta("n",i,"update",3)}</label></div></div>`).join(""))}
     ${sec("Take off the list", rv.a.length, rv.a.map((a,i)=>`<div class="rv a${a.take?"":" off"}"><div class="rh">${box("a",i,esc(pname(a.project_id)))}<label class="f" style="min-width:150px">${selr("a",i,"status",[["Completed","Completed"],["Dropped","Dropped"]])}</label></div>${a.reason?`<div class="why">${esc(a.reason)}</div>`:""}</div>`).join(""))}
-    ${sec("To-dos for the week", rv.t.length, `<div>${rv.t.map((t,i)=>`<div class="rvtodo${t.take?"":" off"}"><input type="checkbox" data-rv="t.${i}.take"${t.take?" checked":""} aria-label="Add this to-do">${inp("t",i,"text","To-do")}${inp("t",i,"owner","Owner")}
+    ${sec("To-dos for the week", rv.t.length, `<div>${rv.t.map((t,i)=>`<div class="rvtodo${t.take?"":" off"}"><input type="checkbox" data-rv="t.${i}.take"${t.take?" checked":""} aria-label="Add this to-do">${inp("t",i,"text","To-do")}
         <select data-rv="t.${i}.project_ref" aria-label="Project"><option value="">No project</option>${projOpts.map(([v,l])=>`<option value="${esc(v)}"${v===t.project_ref?" selected":""}>${esc(l)}</option>`).join("")}</select>${inp("t",i,"due","Due","date")}
         ${t.quote?`<div class="q">"${esc(t.quote)}"</div>`:""}</div>`).join("")}</div>`)}
-    ${sec("Reminders: people to follow up with", rv.r.length, `<div>${rv.r.map((t,i)=>`<div class="rvrem${t.take?"":" off"}"><input type="checkbox" data-rv="r.${i}.take"${t.take?" checked":""} aria-label="Add this reminder">${inp("r",i,"person","Follow up with")}${inp("r",i,"about","About what")}${inp("r",i,"owner","Who")}
+    ${sec("Reminders: people to follow up with", rv.r.length, `<div>${rv.r.map((t,i)=>`<div class="rvrem${t.take?"":" off"}"><input type="checkbox" data-rv="r.${i}.take"${t.take?" checked":""} aria-label="Add this reminder">${inp("r",i,"person","Follow up with")}${inp("r",i,"about","About what")}
         <select data-rv="r.${i}.project_ref" aria-label="Project"><option value="">No project</option>${projOpts.map(([v,l])=>`<option value="${esc(v)}"${v===t.project_ref?" selected":""}>${esc(l)}</option>`).join("")}</select>${inp("r",i,"due","By","date")}
         ${t.quote?`<div class="q">"${esc(t.quote)}"</div>`:""}</div>`).join("")}</div>`)}
     ${sec("Key developments", rv.k.length, rv.k.map((k,i)=>`<div class="rv${k.take?"":" off"}" style="border-left-color:var(--lblue)"><div class="rh">${box("k",i,"Add to key developments")}</div>

@@ -47,16 +47,18 @@ Every project has a status:
 Each project also has a weekly update: the free-text notes for this week.
 
 What to propose:
-- project_updates: for each existing project discussed in the meeting, the new weekly update and, if it changed, the new status (Active or Pending; "" when it doesn't change). Write the update the way the team writes it: short bullet lines, each starting with "- ", plain English, initials for people on the team (WL, ZT and so on), dates like 11/3. Replace the whole update with this week's position; carry over a line from the old update only if the meeting said it still applies. Leave out projects that weren't discussed. Use "" for description, stakeholders, corp_dev and stage when they don't change. Only External Growth Initiatives projects have a deal stage.
+- project_updates: for each existing project discussed in the meeting, the new weekly update and, if it changed, the new status (Active or Pending; "" when it doesn't change). Write the update the way the team writes it: short bullet lines, each starting with "- ", plain English, dates like 11/3, and no names or initials of the people in the meeting. Replace the whole update with this week's position; carry over a line from the old update only if the meeting said it still applies. Leave out projects that weren't discussed. Use "" for description and stage when they don't change, and always "" for stakeholders and corp_dev. Only External Growth Initiatives projects have a deal stage.
 - new_projects: projects discussed that aren't on the list, with status Active or Pending. Pick the best category and say why in category_reason (one short sentence naming the deciding fact). Check the existing list first so you don't propose a duplicate under a slightly different name.
 - archive: projects the meeting said are finished (status Completed) or killed, dropped or to be removed without finishing (status Dropped).
-- todos: concrete action items for the coming week: who does what, by when. owner is the person's initials from the team list when they are on the team, otherwise their name. due is YYYY-MM-DD when a date or day was said ("by Friday" is the Friday after the meeting date), otherwise "". project_ref is the id of an existing project, the exact name of a project in new_projects, or "". quote is a short phrase from the transcript that supports it.
-- reminders: people to follow up with, so the team remembers to get in touch. Examples: "we need to schedule a meeting with B. Sample" (person "B. Sample", about "Schedule a meeting"), "I need to check with C. Person when he's back in New York" (person "C. Person", about "Check when he's back in New York"). person is the name as said (with company if mentioned); about is a short phrase on what to follow up on; owner, project_ref, due and quote work as for todos. An item that is mainly about contacting someone goes in reminders, not todos; don't list it twice.
+- todos: concrete action items for the coming week: what needs to be done and by when. Tasks have no owner: don't say who will do it. due is YYYY-MM-DD when a date or day was said ("by Friday" is the Friday after the meeting date), otherwise "". project_ref is the id of an existing project, the exact name of a project in new_projects, or "". quote is a short phrase from the transcript that supports it.
+- reminders: people to follow up with, so the team remembers to get in touch. Examples: "we need to schedule a meeting with B. Sample" (person "B. Sample", about "Schedule a meeting"), "I need to check with C. Person when he's back in New York" (person "C. Person", about "Check when he's back in New York"). person is the name of the person to follow up with, as said in the meeting (with company if mentioned); about is a short phrase on what to follow up on; project_ref, due and quote work as for todos. There is no owner: don't say who on the team will follow up. An item that is mainly about contacting someone goes in reminders, not todos; don't list it twice.
 - developments: key developments discussed that are not about a specific project on the list: industry trends, news about other companies (results, deals, people moves), market and pricing moves, regulation, and Ascot company news. title is a short headline in sentence case; detail is one to three plain sentences on what was said and why it matters; topic is one of Industry trends, Company news, Market and deals, Regulation, Ascot, Other; quote is a short supporting phrase. Leave out small talk and anything already captured as a project update, to-do or reminder.
 - todos_done: open to-dos and reminders (listed in the user message) that the meeting said are done.
 - summary: two or three plain sentences on what the meeting covered.
 
 Rules:
+- Speaker labels in the transcript (for example "Conference Room", a meeting room, a phone number or "Speaker 1") name the device or room the audio came from, not a person. Never treat a speaker label as a person, an owner or a source of names.
+- Names are kept only in reminders, as the person to follow up with. Don't put the names or initials of people in the meeting in updates, to-dos, new projects or key developments, and never assign an owner to anything. If an item is mainly about contacting a named person, make it a reminder.
 - Only use what the transcript says. If something is unclear (who owns it, which project it belongs to), say so in the reason or leave the field blank rather than guessing.
 - Use the exact ids from the user message.
 - Sentence case, no em dashes.
@@ -77,8 +79,8 @@ export const SCHEMA = obj({
     description: str, stakeholders: str, corp_dev: str, update: str, status: { type: "string", enum: [...OPEN_STATUSES] }, stage: { type: "string", enum: ["", ...STAGES] },
   }) },
   archive: { type: "array", items: obj({ project_id: str, status: { type: "string", enum: ["Completed", "Dropped"] }, reason: str }) },
-  todos: { type: "array", items: obj({ text: str, owner: str, project_ref: str, due: str, quote: str }) },
-  reminders: { type: "array", items: obj({ person: str, about: str, owner: str, project_ref: str, due: str, quote: str }) },
+  todos: { type: "array", items: obj({ text: str, project_ref: str, due: str, quote: str }) },
+  reminders: { type: "array", items: obj({ person: str, about: str, project_ref: str, due: str, quote: str }) },
   developments: { type: "array", items: obj({ title: str, detail: str, topic: { type: "string", enum: [...DEV_TOPICS] }, quote: str }) },
   todos_done: { type: "array", items: obj({ todo_id: str, reason: str }) },
 });
@@ -116,7 +118,6 @@ export function userMessage(i: Input): string {
   const examples = i.examples.map((e) => ({ name: e.name, category: e.category, ...(e.description ? { description: e.description } : {}), ...(e.corrected ? { corrected: true } : {}) }));
   return [
     `Meeting date: ${i.meetingDate}`,
-    `Team (name and initials): ${JSON.stringify(i.team)}`,
     `Current project list (JSON):\n${JSON.stringify(projects)}`,
     `How the team has categorised projects before (JSON):\n${JSON.stringify(examples)}`,
     `Open to-dos and reminders (JSON):\n${JSON.stringify(i.openTodos)}`,
@@ -149,13 +150,13 @@ export function cleanProposal(raw: unknown, i: Input): Proposal {
 
   const project_updates = list(r.project_updates).filter((u) => ids.has(String(u.project_id)) && once("u:" + u.project_id)).map((u) => ({
     project_id: String(u.project_id), update: clip(u.update, 4000), status: open(u.status), stage: stage(u.stage), description: clip(u.description, 2000),
-    stakeholders: clip(u.stakeholders, 300), corp_dev: clip(u.corp_dev, 100), reason: clip(u.reason, 500),
+    stakeholders: "", corp_dev: "", reason: clip(u.reason, 500),
   }));
   const existingNames = new Set(i.projects.map((p) => p.name.trim().toLowerCase()));
   const new_projects = list(r.new_projects).filter((n) => String(n.name ?? "").trim() && !existingNames.has(String(n.name).trim().toLowerCase()) && once("n:" + String(n.name).trim().toLowerCase())).map((n) => {
     const category = (CATEGORIES as readonly string[]).includes(String(n.category)) ? String(n.category) : "Other Projects";
     return { name: clip(n.name, 200).trim(), category, category_reason: clip(n.category_reason, 500), quarter: clip(n.quarter, 20),
-      description: clip(n.description, 2000), stakeholders: clip(n.stakeholders, 300), corp_dev: clip(n.corp_dev, 100),
+      description: clip(n.description, 2000), stakeholders: "", corp_dev: "",
       update: clip(n.update, 4000), status: open(n.status) || "Active", stage: category === "External Growth Initiatives" ? stage(n.stage) : "" };
   });
   const archive = list(r.archive).filter((a) => ids.has(String(a.project_id)) && once("a:" + a.project_id)).map((a) => ({
@@ -164,14 +165,14 @@ export function cleanProposal(raw: unknown, i: Input): Proposal {
   const newNames = new Set(new_projects.map((n) => n.name.toLowerCase()));
   const todos = list(r.todos).filter((t) => String(t.text ?? "").trim()).map((t) => {
     const ref = String(t.project_ref ?? "").trim();
-    return { text: clip(t.text, 500).trim(), owner: clip(t.owner, 60).trim(), due: date(t.due), quote: clip(t.quote, 300),
+    return { text: clip(t.text, 500).trim(), owner: "", due: date(t.due), quote: clip(t.quote, 300),
       project_ref: ids.has(ref) || newNames.has(ref.toLowerCase()) ? ref : "" };
   }).filter((t) => once("t:" + t.text.toLowerCase()));
   const todos_done = list(r.todos_done).filter((d) => todoIds.has(String(d.todo_id)) && once("d:" + d.todo_id))
     .map((d) => ({ todo_id: String(d.todo_id), reason: clip(d.reason, 300) }));
   const reminders = list(r.reminders).filter((m) => String(m.person ?? "").trim() || String(m.about ?? "").trim()).map((m) => {
     const ref = String(m.project_ref ?? "").trim();
-    return { person: clip(m.person, 120).trim(), about: clip(m.about, 400).trim(), owner: clip(m.owner, 60).trim(), due: date(m.due), quote: clip(m.quote, 300),
+    return { person: clip(m.person, 120).trim(), about: clip(m.about, 400).trim(), owner: "", due: date(m.due), quote: clip(m.quote, 300),
       project_ref: ids.has(ref) || newNames.has(ref.toLowerCase()) ? ref : "" };
   }).filter((m) => once("r:" + (m.person + "|" + m.about).toLowerCase()));
   const developments = list(r.developments).filter((d) => String(d.title ?? "").trim() || String(d.detail ?? "").trim()).map((d) => ({
