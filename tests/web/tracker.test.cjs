@@ -127,6 +127,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   let r1 = await doc(p, "todos", "r1");
   ok("reminder records who and when", r1.calTo === "c2" && r1.calName === "Sam Sample" && r1.calAt === sd, r1);
   ok("drawer shows it", (await p.textContent("#calBox")).includes("Calendar reminder for Sam Sample"));
+  ok("drawer previews the invite wording", (await p.textContent("#calBox .invprev pre")) === "Project Name: Project Lantern\nFollow-up task: Follow up with B. Sample: Schedule a meeting", await p.textContent("#calBox .invprev pre"));
   const [ics] = await Promise.all([p.waitForEvent("download"), p.click('[data-act="cal-ics"][data-h="24"]')]);
   const icsText = fs.readFileSync(await ics.path(), "utf8").replace(/\r\n /g, "");   // unfold long lines
   ok("desktop Outlook file has the invitee and alarm", /ATTENDEE;CN=Sam Sample;.*mailto:sam@ascot.test/.test(icsText) && icsText.includes("SUMMARY:Reminder: follow up with B. Sample") && icsText.includes("TRIGGER:-PT15M"), icsText.slice(0, 400));

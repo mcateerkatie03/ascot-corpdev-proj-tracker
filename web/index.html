@@ -121,6 +121,8 @@ footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-bl
 .emailbox h3{margin:0;font-size:14px}
 .emailbox .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .emailbox select{width:auto;min-width:200px;max-width:100%}
+.invprev{background:var(--surface);border:1px solid var(--grid);padding:8px 10px;font-size:13px}
+.invprev pre{margin:4px 0 0;font:inherit;white-space:pre-wrap;overflow-wrap:anywhere}
 .calbtn{background:none;border:0;padding:0;margin:0;font:inherit;color:var(--blue);text-decoration:underline;cursor:pointer}
 .emailbox .st{font-size:13px}
 .emailbox .st.failed{color:var(--magenta)}
@@ -547,7 +549,9 @@ function calendarBoxHTML(id){
       <button type="button" class="btn sm primary" data-act="cal-open" data-h="24" data-id="${esc(id)}">Remind in 24 hours</button><button type="button" class="btn sm" data-act="cal-open" data-h="48" data-id="${esc(id)}">Remind in 48 hours</button></div>
     <div class="t2">Opens a new Outlook calendar event with them invited and the details filled in. Check it, then click <b>Send</b>. Using desktop Outlook instead? Download it <button type="button" class="calbtn" data-act="cal-ics" data-h="24" data-id="${esc(id)}">for 24 hours</button> or <button type="button" class="calbtn" data-act="cal-ics" data-h="48" data-id="${esc(id)}">for 48 hours</button> and open the file.</div>`
     : `<div class="st t2">No one to choose yet. Add names under <a href="#" data-act="settings">Settings</a> (the menu under your initials).</div>`;
-  return `<div class="emailbox"><h3>Send a calendar reminder</h3>${status}${pick}</div>`;
+  const d=calDetails(t), preview=d.body.split("\n\nOnce")[0].split("\n\n").slice(1).join("\n");
+  return `<div class="emailbox"><h3>Send a calendar reminder</h3>${status}${pick}
+    <div class="invprev" aria-label="What the invite will say"><div class="t2">The invite will say:</div><b>${esc(d.subject)}</b><pre>${esc(preview)}</pre></div></div>`;
 }
 async function openCalendar(id, hours, how){
   const t=allRows().find(x=>x.id===id), c=contacts().find(x=>x.id===val("cal_to")); if(!t) return; if(!c){ toast("Choose who to remind."); return; }
