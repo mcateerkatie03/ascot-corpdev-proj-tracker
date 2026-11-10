@@ -729,7 +729,7 @@ function comingUpHTML(){
 function monthStr(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 function renderCalendar(){
   const ym=S.calMonth||monthStr(new Date()), [y,m]=ym.split("-").map(Number);
-  const first=new Date(y,m-1,1), daysIn=new Date(y,m,0).getDate(), lead=(first.getDay()+6)%7, weeks=Math.ceil((lead+daysIn)/7);
+  const first=new Date(y,m-1,1), daysIn=new Date(y,m,0).getDate(), lead=first.getDay(), weeks=Math.ceil((lead+daysIn)/7);
   const today=TODAY(), monthStart=`${ym}-01`, monthEnd=`${ym}-${String(daysIn).padStart(2,"0")}`;
   const evs=S.events.filter(e=>S.etype==="all"||(e.type||"Other")===S.etype).sort((a,b)=>a.date.localeCompare(b.date)||String(a.text).localeCompare(String(b.text)));
   let cells="";
@@ -749,7 +749,7 @@ function renderCalendar(){
     <label>Date<input type="date" id="ne_date" value=""></label><label>End date <span class="t2" style="font-weight:normal">(if more than a day)</span><input type="date" id="ne_end"></label><button class="btn primary">Add event</button></form>
   <div class="calhead"><h3>${esc(label)}</h3><button type="button" class="btn sm" data-act="cal-month" data-v="-1" aria-label="Previous month">&lsaquo; Previous</button><button type="button" class="btn sm" data-act="cal-month" data-v="0">Today</button><button type="button" class="btn sm" data-act="cal-month" data-v="1" aria-label="Next month">Next &rsaquo;</button></div>
   <div class="fchips" role="group" aria-label="Event type">${chip("all","All types",all.length)}${EVENT_TYPES.map(t=>chip(t,t,all.filter(e=>(e.type||"Other")===t).length)).filter((c,i)=>all.some(e=>(e.type||"Other")===EVENT_TYPES[i])||S.etype===EVENT_TYPES[i]).join("")}</div>
-  <div class="calgrid" role="grid" aria-label="${esc(label)}">${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>`<div class="dow">${d}</div>`).join("")}${cells}</div>
+  <div class="calgrid" role="grid" aria-label="${esc(label)}">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="dow">${d}</div>`).join("")}${cells}</div>
   <div class="evlegend" aria-hidden="true">${EVENT_TYPES.map(t=>`<span class="${tcls(t)}"><i></i><span style="color:var(--ink)">${esc(t)}</span></span>`).join("")}</div>
   <section><h3 class="sec">${esc(label)} <span class="n">${month.length}</span></h3>${month.length?`<ul class="mlist agenda">${month.map(e=>`<li class="click" data-act="open-todo" data-id="${esc(e.id)}" tabindex="0"><span class="d">${esc(evWhen(e))}</span><div><p><b>${esc(e.text)}</b></p><p class="meta"><span class="${tcls(e.type)}">&#9632;</span> ${esc(e.type||"Other")}${e.location?` &middot; ${esc(e.location)}`:""}${e.notes?` &middot; ${esc(e.notes)}`:""}</p></div></li>`).join("")}</ul>`:`<p class="t2">Nothing on the calendar this month.</p>`}</section>`;
 }

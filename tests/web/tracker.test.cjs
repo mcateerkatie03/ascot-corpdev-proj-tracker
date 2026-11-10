@@ -345,6 +345,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   const next = await p.evaluate(() => S.calMonth);
   ok("next month", next > calCur, next);
   await p.click('[data-act="cal-month"][data-v="0"]');
+  ok("weeks run Sunday to Saturday", (await p.$$eval(".calgrid .dow", x => x.map(e => e.textContent).join(","))) === "Sun,Mon,Tue,Wed,Thu,Fri,Sat" && (await p.evaluate(() => { const c = document.querySelectorAll(".calgrid .day"); return [c[0].getAttribute("aria-label").split(" ")[0], c[6].getAttribute("aria-label").split(" ")[0]].join(","); })) === "Sunday,Saturday");
   ok("today button", (await p.evaluate(() => S.calMonth)) === "" && !!(await p.$(".calgrid .day.today")));
   await p.fill("#ne_text", "Strategy day"); await p.selectOption("#ne_type", "Strategy day"); await p.fill("#ne_date", dd(40)); await p.fill("#ne_end", dd(39));
   await p.click("#addEvForm button"); await p.waitForTimeout(250);
