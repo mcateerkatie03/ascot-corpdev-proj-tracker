@@ -26,6 +26,9 @@ const seed = [
   ["todos", "k1", { kind: "development", text: "Casualty rates starting to soften", notes: "Two brokers said renewals came in lower.", topic: "Industry trends", meetingId: "m" + LAST, meetingDate: LAST, createdAt: now - 4 * DAY }],
   ["todos", "k2", { kind: "development", text: "Sample Re results", notes: "", topic: "Company news", meetingId: "m" + PREV, meetingDate: PREV, createdAt: now - 11 * DAY }],
   ["settings", "contacts", { list: [{ id: "c1", name: "Jane Example", email: "jane@ascot.test" }, { id: "c2", name: "Sam Sample", email: "sam@ascot.test" }] }],
+  ["todos", "e1", { kind: "event", text: "Global town hall", type: "Town hall", date: dd(5), endDate: "", location: "London", notes: "", createdAt: now }],
+  ["todos", "e2", { kind: "event", text: "Leadership offsite", type: "Offsite", date: dd(10), endDate: dd(12), createdAt: now }],
+  ["todos", "e3", { kind: "event", text: "Thanksgiving", type: "Holiday", date: dd(60), createdAt: now }],
   ["meetings", "m" + LAST, { date: LAST, title: "Weekly meeting", summary: "Covered the sample projects.", source: "transcript", snapshot: [{ id: "p1", name: "Harbor Review", category: "Portfolio Growth Initiatives", status: "Active", update: "- Draft out", description: "Review of the internal operating model" }] }],
   ["meetings", "m" + PREV, { date: PREV, title: "Weekly meeting", source: "import", snapshot: [] }],
 ];
@@ -43,6 +46,7 @@ const PROPOSAL = {
     { text: "Circulate Harbor draft", owner: "ZT", project_ref: "p1", due: "", quote: "" },
     { text: "Unwanted item", owner: "", project_ref: "", due: "", quote: "" },
   ],
+  events: [{ title: "Investor day", type: "Investor event", date: dd(20), end_date: "", notes: "New York", quote: "investor day on the date" }, { title: "Global town hall", type: "Town hall", date: dd(5), end_date: "", notes: "", quote: "" }],
   developments: [{ title: "Sample peer announced a sidecar", detail: "Discussed as a sign of more third-party capital.", topic: "Market and deals", quote: "they announced a sidecar" }],
   reminders: [{ person: "C. Person", about: "Check when he's back in New York", owner: "ZT", project_ref: "p1", due: "", quote: "check with C. Person" }],
   todos_done: [{ todo_id: "t1", reason: "Sent" }, { todo_id: "r1", reason: "Meeting booked" }],
@@ -207,7 +211,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("request carries open projects only", sent && sent.projects.map(x => x.id).sort().join(",") === "p1,p2,p3,p4", sent && sent.projects.map(x => x.id));
   ok("request carries categorised examples incl. archived", sent.examples.some(e => e.name === "Old Sample Deal"));
   ok("request carries open to-dos, reminders and team initials, not developments", sent.openTodos.length === 4 && sent.openTodos.some(t => t.text === "Reminder: follow up with B. Sample: Schedule a meeting") && sent.team.some(t => t.initials === "WL"), sent.openTodos);
-  ok("review lists all sections", (await p.$$eval("#rvBody h3.sec", x => x.map(e => e.textContent.replace(/\s*\d+$/, "").trim()).join("|"))) === "Project updates|New projects|Take off the list|To-dos for the week|Reminders: people to follow up with|Key developments|Open to-dos and reminders the meeting said are done");
+  ok("review lists all sections", (await p.$$eval("#rvBody h3.sec", x => x.map(e => e.textContent.replace(/\s*\d+$/, "").trim()).join("|"))) === "Project updates|New projects|Take off the list|To-dos for the week|Reminders: people to follow up with|Key developments|Calendar events|Open to-dos and reminders the meeting said are done");
   ok("old update shown for comparison", (await p.textContent("#rvBody .rv .old")).includes("Draft out"));
   ok("Claude's category reason shown", (await p.textContent("#rvBody")).includes("Minority stake in an external MGA"));
   await p.uncheck('[data-rv="t.2.take"]');
@@ -227,6 +231,8 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("done to-do marked", T.find(t => t.id === "t1").done === true);
   ok("reminder from the transcript saved", T.some(t => t.kind === "reminder" && t.person === "C. Person" && t.text === "Check when he's back in New York" && t.projectId === "p1" && t.meetingId === "m" + dd(0)));
   ok("reminder the meeting closed is done", T.find(t => t.id === "r1").done === true);
+  ok("calendar event from the transcript saved", T.some(t => t.kind === "event" && t.text === "Investor day" && t.type === "Investor event" && t.date === dd(20) && t.notes === "New York"));
+  ok("event already on the calendar not added twice", T.filter(t => t.kind === "event" && t.text === "Global town hall").length === 1);
   ok("key development from the transcript saved", T.some(t => t.kind === "development" && t.text === "Sample peer announced a sidecar" && t.topic === "Market and deals" && t.notes.startsWith("Discussed") && t.meetingId === "m" + dd(0)));
   const mt = M.find(m => m.id === "m" + dd(0));
   ok("meeting recorded with snapshot incl. the dropped project", mt && mt.summary === "Sample summary of the meeting." && mt.snapshot.some(s => s.id === "p2" && s.status === "Dropped") && mt.snapshot.some(s => s.name === "Project Kestrel"), mt);
@@ -282,7 +288,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   const fp = path.join(OUT, dl.suggestedFilename()); await dl.saveAs(fp);
   const back = XLSX.readFile(fp);
   ok("export file name", /^Corp_Dev_Project_List_As_of_11\.02\.26\.xlsx$/.test(dl.suggestedFilename()), dl.suggestedFilename());
-  ok("export sheets", back.SheetNames.join(",") === "Current,To-dos,Old Projects,Reminders,Key developments,11.02.26,10.27.26", back.SheetNames);
+  ok("export sheets", back.SheetNames.join(",") === "Current,To-dos,Old Projects,Reminders,Key developments,Calendar,11.02.26,10.27.26", back.SheetNames);
   const curBack = XLSX.utils.sheet_to_json(back.Sheets.Current, { header: 1, defval: "" });
   ok("export keeps the empty board category heading", curBack.some(r => r[0] === "Quarterly Board Updates"));
   // re-import the export: same projects are skipped
@@ -325,13 +331,44 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("key development edited", (await doc(p, "todos", "k2")).text === "Sample Re results beat");
   await p.fill("#dq", "regulation"); await p.waitForTimeout(50);
   ok("search", (await p.$$(".dev")).length === 1 && await p.evaluate(() => document.activeElement.id === "dq"));
+  // calendar
+  await p.goto(BASE + "#week"); await p.waitForTimeout(300);
+  ok("dashboard coming up: next 30 days only", (await p.textContent("section.cols")).includes("Global town hall") && (await p.textContent("section.cols")).includes("Leadership offsite") && !(await p.textContent("section.cols")).includes("Thanksgiving"));
+  await p.goto(BASE + "#calendar"); await p.waitForTimeout(300);
+  const monthOf = d => d.slice(0, 7), calCur = monthOf(dd(0));
+  await p.evaluate(m => { S.calMonth = m; render(); }, monthOf(dd(5)));
+  ok("town hall on its day", (await p.$$eval(".calgrid .ev", x => x.filter(e => e.dataset.id === "e1").length)) === 1);
+  await p.evaluate(m => { S.calMonth = m; render(); }, monthOf(dd(11)));
+  const offDays = await p.$$eval('.calgrid .ev[data-id="e2"]', x => x.length);
+  ok("multi-day offsite spans its days", offDays >= 1 && offDays <= 3, offDays);
+  await p.evaluate(m => { S.calMonth = m; render(); }, calCur);
+  await p.click('[data-act="cal-month"][data-v="1"]');
+  const next = await p.evaluate(() => S.calMonth);
+  ok("next month", next > calCur, next);
+  await p.click('[data-act="cal-month"][data-v="0"]');
+  ok("today button", (await p.evaluate(() => S.calMonth)) === "" && !!(await p.$(".calgrid .day.today")));
+  await p.fill("#ne_text", "Strategy day"); await p.selectOption("#ne_type", "Strategy day"); await p.fill("#ne_date", dd(40)); await p.fill("#ne_end", dd(39));
+  await p.click("#addEvForm button"); await p.waitForTimeout(250);
+  const ne = (await docs(p, "todos")).find(t => t.text === "Strategy day");
+  ok("event added, bad end date dropped, calendar jumps to its month", ne && ne.kind === "event" && ne.type === "Strategy day" && ne.date === dd(40) && ne.endDate === "" && (await p.evaluate(() => S.calMonth)) === dd(40).slice(0, 7), ne);
+  ok("agenda lists the month's events", (await p.textContent(".agenda")).includes("Strategy day"));
+  await p.click(`.agenda li[data-id="${ne.id}"]`); await p.waitForSelector("#f_etype");
+  await p.selectOption("#f_etype", "Holiday"); await p.fill("#f_location", "All offices"); await p.click('.drawer-f [data-act="save-todo"]'); await p.waitForTimeout(250);
+  ok("event edited", (await doc(p, "todos", ne.id)).type === "Holiday" && (await doc(p, "todos", ne.id)).location === "All offices");
+  await p.click(`.agenda li[data-id="${ne.id}"]`); await p.waitForSelector("#f_etype");
+  const [evDl] = await Promise.all([p.waitForEvent("download"), p.click('[data-act="ev-ics"]')]);
+  const evIcs = fs.readFileSync(await evDl.path(), "utf8");
+  ok("event calendar file is an all-day event", evIcs.includes("DTSTART;VALUE=DATE:" + dd(40).replace(/-/g, "")) && evIcs.includes("SUMMARY:Strategy day") && evIcs.includes("LOCATION:All offices"));
+  await p.click('.drawer-h [data-act="close"]');
+  await p.click('.fchip[data-act="etype"][data-v="Holiday"]');
+  ok("type filter", (await p.$$eval(".agenda li", x => x.length)) === 1);
   ok("no page errors (2)", !p.errs.length, p.errs);
   await p.screenshot({ path: path.join(OUT, "meeting.png") });
   await p.close();
 
   for (const w of [320, 390]) {
     const m = await page(b, { vp: { width: w, height: 800 } });
-    for (const v of ["week", "projects", "todos", "archive", "developments", "meetings"]) {
+    for (const v of ["week", "projects", "todos", "archive", "developments", "calendar", "meetings"]) {
       await m.goto(BASE + "#" + v); await m.waitForTimeout(250);
       const sw = await m.evaluate(() => document.documentElement.scrollWidth); ok(`no sideways scroll ${w} ${v}`, sw <= w, sw);
     }

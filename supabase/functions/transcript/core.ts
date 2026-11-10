@@ -13,6 +13,7 @@ export const STAGES = ["Screening", "NDA signed", "LOI", "Diligence", "Closed", 
 export const STATUSES = ["Active", "Pending", "Completed", "Dropped"] as const;
 export const OPEN_STATUSES = ["Active", "Pending"] as const;
 
+export const EVENT_TYPES = ["Town hall", "Strategy day", "Offsite", "Conference", "Board meeting", "Investor event", "Holiday", "Other"] as const;
 export const DEV_TOPICS = ["Industry trends", "Company news", "Market and deals", "Regulation", "Ascot", "Other"] as const;
 
 export const MAX_TRANSCRIPT_CHARS = 400_000;
@@ -53,6 +54,7 @@ What to propose:
 - todos: concrete action items for the coming week: what needs to be done and by when. Tasks have no owner: don't say who will do it. due is YYYY-MM-DD when a date or day was said ("by Friday" is the Friday after the meeting date), otherwise "". project_ref is the id of an existing project, the exact name of a project in new_projects, or "". quote is a short phrase from the transcript that supports it.
 - reminders: people to follow up with, so the team remembers to get in touch. Examples: "we need to schedule a meeting with B. Sample" (person "B. Sample", about "Schedule a meeting"), "I need to check with C. Person when he's back in New York" (person "C. Person", about "Check when he's back in New York"). person is the name of the person to follow up with, as said in the meeting (with company if mentioned); about is a short phrase on what to follow up on; project_ref, due and quote work as for todos. There is no owner: don't say who on the team will follow up. An item that is mainly about contacting someone goes in reminders, not todos; don't list it twice.
 - developments: key developments discussed that are not about a specific project on the list: industry trends, news about other companies (results, deals, people moves), market and pricing moves, regulation, and Ascot company news. title is a short headline in sentence case; detail is one to three plain sentences on what was said and why it matters; topic is one of Industry trends, Company news, Market and deals, Regulation, Ascot, Other; quote is a short supporting phrase. Leave out small talk and anything already captured as a project update, to-do or reminder.
+- events: company-wide events and holidays mentioned with a date, for the team calendar: town halls, strategy days, offsites, conferences, board meetings, investor days and conferences, and public or company holidays. Only include an event when a specific date or date range was said or can be worked out from the meeting date ("next Thursday"); leave it out if only a month or season was mentioned. title is the event's name in sentence case; type is one of Town hall, Strategy day, Offsite, Conference, Board meeting, Investor event, Holiday, Other; date is YYYY-MM-DD; end_date is YYYY-MM-DD for a multi-day event, otherwise ""; notes is one short sentence of detail (location, what's needed) or ""; quote is a short supporting phrase. Don't include internal deadlines or the team's own meetings; those are to-dos.
 - todos_done: open to-dos and reminders (listed in the user message) that the meeting said are done.
 - summary: two or three plain sentences on what the meeting covered.
 
@@ -82,6 +84,7 @@ export const SCHEMA = obj({
   todos: { type: "array", items: obj({ text: str, project_ref: str, due: str, quote: str }) },
   reminders: { type: "array", items: obj({ person: str, about: str, project_ref: str, due: str, quote: str }) },
   developments: { type: "array", items: obj({ title: str, detail: str, topic: { type: "string", enum: [...DEV_TOPICS] }, quote: str }) },
+  events: { type: "array", items: obj({ title: str, type: { type: "string", enum: [...EVENT_TYPES] }, date: str, end_date: str, notes: str, quote: str }) },
   todos_done: { type: "array", items: obj({ todo_id: str, reason: str }) },
 });
 
@@ -133,6 +136,7 @@ export type Proposal = {
   todos: { text: string; owner: string; project_ref: string; due: string; quote: string }[];
   reminders: { person: string; about: string; owner: string; project_ref: string; due: string; quote: string }[];
   developments: { title: string; detail: string; topic: string; quote: string }[];
+  events: { title: string; type: string; date: string; end_date: string; notes: string; quote: string }[];
   todos_done: { todo_id: string; reason: string }[];
 };
 
@@ -179,5 +183,10 @@ export function cleanProposal(raw: unknown, i: Input): Proposal {
     title: clip(d.title, 200).trim(), detail: clip(d.detail, 1500).trim(), quote: clip(d.quote, 300),
     topic: (DEV_TOPICS as readonly string[]).includes(String(d.topic)) ? String(d.topic) : "Other",
   })).filter((d) => once("k:" + (d.title || d.detail).toLowerCase()));
-  return { summary: clip(r.summary, 2000), project_updates, new_projects, archive, todos, reminders, developments, todos_done };
+  const events = list(r.events).filter((e) => String(e.title ?? "").trim() && date(e.date)).map((e) => {
+    const d = date(e.date), end = date(e.end_date);
+    return { title: clip(e.title, 200).trim(), type: (EVENT_TYPES as readonly string[]).includes(String(e.type)) ? String(e.type) : "Other",
+      date: d, end_date: end && end > d ? end : "", notes: clip(e.notes, 500).trim(), quote: clip(e.quote, 300) };
+  }).filter((e) => once("e:" + e.title.toLowerCase() + "|" + e.date));
+  return { summary: clip(r.summary, 2000), project_updates, new_projects, archive, todos, reminders, developments, events, todos_done };
 }

@@ -79,6 +79,12 @@ const raw = {
     { title: "Peer results", detail: "", topic: "Gossip", quote: "" },
     { title: "", detail: "", topic: "Other", quote: "" },
   ],
+  events: [
+    { title: "Global town hall", type: "Town hall", date: "2026-12-03", end_date: "", notes: "", quote: "" },
+    { title: "global town hall", type: "Town hall", date: "2026-12-03", end_date: "", notes: "", quote: "" },
+    { title: "Strategy offsite", type: "Retreat", date: "2027-01-12", end_date: "2027-01-10", notes: "", quote: "" },
+    { title: "Some conference", type: "Conference", date: "spring", end_date: "", notes: "", quote: "" },
+  ],
   todos_done: [{ todo_id: "t1", reason: "" }, { todo_id: "t9", reason: "" }],
 };
 const c = cleanProposal(raw, input);
@@ -97,8 +103,10 @@ ok("done list keeps known to-dos only", c.todos_done.length === 1 && c.todos_don
 ok("reminders: duplicates and empty ones dropped", c.reminders.length === 2 && c.reminders[0].person === "B. Sample" && c.reminders[0].project_ref === "Kestrel", c.reminders);
 ok("reminders: unknown project and bad date cleared", c.reminders[1].project_ref === "" && c.reminders[1].due === "");
 ok("developments: duplicates and empty ones dropped, unknown topic read as Other", c.developments.length === 2 && c.developments[1].topic === "Other", c.developments);
+ok("events: duplicates and undated dropped, unknown type Other, bad end date cleared", c.events.length === 2 && c.events[1].type === "Other" && c.events[1].end_date === "", c.events);
+ok("system prompt explains events", /events: company-wide events and holidays/.test(SYSTEM));
 ok("system prompt explains developments", /developments: key developments discussed/.test(SYSTEM));
 ok("system prompt explains reminders", /reminders: people to follow up with/.test(SYSTEM));
-ok("garbage answer gives empty proposal", JSON.stringify(cleanProposal(null, input)) === JSON.stringify({ summary: "", project_updates: [], new_projects: [], archive: [], todos: [], reminders: [], developments: [], todos_done: [] }));
+ok("garbage answer gives empty proposal", JSON.stringify(cleanProposal(null, input)) === JSON.stringify({ summary: "", project_updates: [], new_projects: [], archive: [], todos: [], reminders: [], developments: [], events: [], todos_done: [] }));
 
 console.log(`${pass} passed, ${fail} failed`); if (fail) Deno.exit(1);

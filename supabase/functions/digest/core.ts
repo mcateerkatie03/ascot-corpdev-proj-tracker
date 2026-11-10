@@ -23,7 +23,9 @@ export type Digest = {
 
 export function buildDigest(input: { projects: Doc[]; todos: Doc[]; history?: HistoryRow[] | null; now: number; siteUrl?: string }): Digest {
   const { projects, now } = input;
-  const todos = input.todos.filter((t) => t.kind !== "reminder" && t.kind !== "development");
+  const todos = input.todos.filter((t) => t.kind !== "reminder" && t.kind !== "development" && t.kind !== "event");
+  const events = input.todos.filter((t) => t.kind === "event" && String(t.endDate || t.date) >= iso(now) && String(t.date) <= iso(now + 7 * DAY))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const developments = input.todos.filter((t) => t.kind === "development" && String(t.meetingDate || (Number(t.createdAt) > 1e11 ? iso(Number(t.createdAt)) : "")) >= iso(now - 7 * DAY));
   const reminders = input.todos.filter((t) => t.kind === "reminder" && !t.done);
   const today = iso(now);
@@ -59,6 +61,7 @@ export function buildDigest(input: { projects: Doc[]; todos: Doc[]; history?: Hi
     { title: "Overdue to-dos", empty: "None.", items: overdue.map((t) => ({ text: todoLine(t), href: link("todo", t.id) })) },
     { title: "To-dos due this week", empty: "None.", items: dueThisWeek.map((t) => ({ text: todoLine(t), href: link("todo", t.id) })) },
     { title: "Reminders: people to follow up with", empty: "None.", items: reminders.map((t) => ({ text: `${t.owner ? `${t.owner}: ` : ""}follow up with ${t.person || "someone"}${t.text ? `, ${t.text}` : ""}${t.projectId && name(t.projectId) ? ` (${name(t.projectId)})` : ""}`, href: link("todo", t.id) })) },
+    { title: "Coming up this week", empty: "Nothing on the calendar.", items: events.map((e) => ({ text: `${fmtDate(String(e.date))}${e.endDate ? ` to ${fmtDate(String(e.endDate))}` : ""}: ${e.text}${e.type ? ` (${e.type})` : ""}`, href: site ? `${site}/#calendar` : "" })) },
     { title: "Key developments from the last week", empty: "None recorded.", items: developments.map((d) => ({ text: `${d.topic ? `${d.topic}: ` : ""}${d.text || ""}${d.notes ? `. ${String(d.notes).split("\n")[0]}` : ""}`, href: site ? `${site}/#developments` : "" })) },
     { title: "Pending projects", empty: "None.", items: pending.map((p) => ({ text: `${p.name}${p.update ? `: ${String(p.update).split("\n")[0].replace(/^-\s*/, "")}` : ""}`, href: link("project", p.id) })) },
     { title: `Quiet: no update in ${QUIET_DAYS / 7} weeks`, empty: "None.", items: quiet.map((p) => ({ text: `${p.name}: last update ${fmtDate(lastUpdate(p))}`, href: link("project", p.id) })) },

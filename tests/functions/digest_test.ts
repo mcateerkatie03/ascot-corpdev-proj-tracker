@@ -22,6 +22,8 @@ const todos = [
   { id: "r1", doc: { kind: "reminder", person: "B. Sample", text: "Schedule a meeting", owner: "WL", projectId: "p1", due: iso(now - 1 * DAY), done: false } },
   { id: "r2", doc: { kind: "reminder", person: "C. Done", text: "x", done: true } },
   { id: "k1", doc: { kind: "development", text: "Casualty rates softening", notes: "Brokers report decreases.", topic: "Industry trends", meetingDate: iso(now - 3 * DAY) } },
+  { id: "e1", doc: { kind: "event", text: "Global town hall", type: "Town hall", date: iso(now + 2 * DAY) } },
+  { id: "e2", doc: { kind: "event", text: "Far offsite", type: "Offsite", date: iso(now + 20 * DAY) } },
   { id: "k2", doc: { kind: "development", text: "Old news", topic: "Other", meetingDate: iso(now - 30 * DAY) } },
 ];
 const history = [
@@ -69,6 +71,7 @@ ok("subject", dry.subject === "Corp Dev weekly: 4 open projects, 1 to-do due thi
 ok("overdue to-do with owner, project and link", dry.text.includes("- ZT: Send draft (Harbor Review), due 7 Nov https://example.github.io/tracker/#todo/t1"), dry.text);
 ok("reminders section, not counted as overdue to-dos", dry.text.includes("- WL: follow up with B. Sample, Schedule a meeting (Harbor Review)") && !dry.text.includes("C. Done") && dry.counts.overdue === 1, dry.text);
 ok("key developments from the last week only", dry.text.includes("- Industry trends: Casualty rates softening. Brokers report decreases.") && !dry.text.includes("Old news") && !dry.text.includes("Casualty rates softening, due"), dry.text);
+ok("events this week only, not counted as to-dos", dry.text.includes("Coming up this week") && dry.text.includes(": Global town hall (Town hall)") && !dry.text.includes("Far offsite") && dry.counts.overdue === 1, dry.text);
 ok("done and later to-dos left out", !dry.text.includes("Done thing") && !dry.text.includes("Later thing"));
 ok("pending shows first update line", dry.text.includes("- Cell <Partnership>: Awaiting proposal"), dry.text);
 ok("quiet project listed", dry.text.includes("- Lantern: last update 10 Oct"), dry.text);

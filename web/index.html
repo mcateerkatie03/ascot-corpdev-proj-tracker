@@ -89,6 +89,30 @@ footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-bl
 
 /* To-do rows */
 .todos{list-style:none;margin:0;padding:0}
+/* Calendar */
+.calhead{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.calhead h3{margin:0 8px 0 0;font-size:20px;color:var(--ink);min-width:170px}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-left:1px solid var(--grid);border-top:1px solid var(--grid)}
+.calgrid .dow{background:var(--head);color:var(--headInk);font-size:12px;font-weight:bold;padding:6px 8px}
+.calgrid .day{min-height:104px;border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);padding:4px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.calgrid .day.out{background:var(--alt)}.calgrid .day.out .dn{color:var(--muted)}
+.calgrid .day.today{box-shadow:inset 0 0 0 2px var(--magenta)}
+.calgrid .day.wkend{background:#FAFAFD}
+.calgrid .dn{font-size:12px;font-weight:bold;padding:1px 3px}
+.ev{display:block;width:100%;text-align:left;border:0;border-left:3px solid currentColor;background:var(--tile);color:var(--ink);font:inherit;font-size:11.5px;line-height:1.3;padding:2px 5px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev:hover{background:#E4E4EF}
+.ev.cont{opacity:.7}
+.evmore{font-size:11px;color:var(--muted);padding-left:4px}
+.et-Town-hall{color:var(--magenta)}.et-Strategy-day{color:var(--purple)}.et-Offsite{color:var(--blue)}.et-Conference{color:var(--lblue)}
+.et-Board-meeting{color:var(--ink)}.et-Investor-event{color:#B35C00}.et-Holiday{color:var(--teal)}.et-Other{color:var(--muted)}
+.ev.et-Holiday{background:#E6F3F2}
+.evlegend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px}
+.evlegend span{display:inline-flex;align-items:center;gap:5px}.evlegend i{width:10px;height:10px;background:currentColor;display:inline-block}
+.agenda li{grid-template-columns:120px minmax(0,1fr)}
+.addev{display:grid;grid-template-columns:minmax(0,1fr) 160px 150px 150px auto;gap:6px;align-items:end}
+.addev label{font-size:11px;font-weight:bold;display:flex;flex-direction:column;gap:2px}
+@media (max-width:900px){.addev{grid-template-columns:1fr 1fr}.addev label:first-child{grid-column:1/-1}}
+@media (max-width:700px){.calgrid{display:none}}
 /* Key developments */
 .devs{display:flex;flex-direction:column;gap:8px}
 .dev{border-left:4px solid var(--lblue);background:var(--alt);padding:10px 14px;cursor:pointer}
@@ -335,6 +359,7 @@ label.chk input{margin-top:3px}
       <a href="#todos" data-view="todos">To-dos<span class="ntag" id="tagTodos"></span></a>
       <a href="#archive" data-view="archive">Archive</a>
       <a href="#developments" data-view="developments">Key developments</a>
+      <a href="#calendar" data-view="calendar">Calendar</a>
       <a href="#meetings" data-view="meetings">Meetings</a>
     </nav>
   </div>
@@ -358,11 +383,12 @@ const STATUS_HELP = {Active:"Ongoing",Pending:"No update, or waiting on someone 
 const STAGES = ["Screening","NDA signed","LOI","Diligence","Closed","On hold","Dead"];   // deal stage: External Growth projects only
 const EXTERNAL = "External Growth Initiatives", BOARD = "Quarterly Board Updates";
 const PROJECT_FIELDS = ["name","category","quarter","status","stage","description","stakeholders","corpDev","update","links"];
-const TODO_FIELDS = ["person","text","topic","owner","projectId","due","done","notes"];
+const TODO_FIELDS = ["person","text","topic","type","date","endDate","location","owner","projectId","due","done","notes"];
 const FIELD_LABELS = {name:"Project",category:"Category",quarter:"Quarter",status:"Status",stage:"Deal stage",description:"Description",stakeholders:"Stakeholders",corpDev:"Corp Dev",update:"Weekly update",links:"Links",
-  person:"Follow up with",text:"To-do",topic:"Topic",owner:"Owner",projectId:"Project",due:"Due",done:"Done",notes:"Notes",closedAt:"Closed",updateDate:"Update date"};
+  person:"Follow up with",text:"To-do",topic:"Topic",type:"Type",date:"Date",endDate:"End date",location:"Location",owner:"Owner",projectId:"Project",due:"Due",done:"Done",notes:"Notes",closedAt:"Closed",updateDate:"Update date"};
 const LONG_FIELDS = ["description","update","notes"];
 const QUIET_DAYS = 21;
+const EVENT_TYPES = ["Town hall", "Strategy day", "Offsite", "Conference", "Board meeting", "Investor event", "Holiday", "Other"];
 const DEV_TOPICS = ["Industry trends", "Company news", "Market and deals", "Regulation", "Ascot", "Other"];
 const DAY_MS = 86400000;
 const XLSX_SRC = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
@@ -374,9 +400,9 @@ if(CFG.supabaseUrl) CFG.supabaseUrl = String(CFG.supabaseUrl).trim().replace(/\/
 const TABLES = ["projects","todos","meetings"];
 const S = {
   view:"week", sb:null, db:null, meId:null, session:null, authChecked:false, started:false, channel:null, loginErr:"", loginBusy:false,
-  projects:[], todos:[], reminders:[], developments:[], meetings:[], loaded:{projects:false,todos:false,meetings:false}, stale:false, configMissing:false,
+  projects:[], todos:[], reminders:[], developments:[], events:[], meetings:[], loaded:{projects:false,todos:false,meetings:false}, stale:false, configMissing:false,
   profiles:{}, settings:{}, hist:{}, changes:null,
-  q:"", pf:"open", pcat:"all", ppl:"all", tf:"open", tpl:"all", aq:"", dq:"", dtopic:"all", drawer:null
+  q:"", pf:"open", pcat:"all", ppl:"all", tf:"open", tpl:"all", aq:"", dq:"", dtopic:"all", calMonth:"", etype:"all", drawer:null
 };
 
 /* ---------- helpers ---------- */
@@ -398,7 +424,7 @@ const isOpen = p => OPEN.includes(p.status||"Active");
 const catOf = p => CATEGORIES.includes(p.category) ? p.category : NO_CAT;
 const projById = id => S.projects.find(p=>p.id===id);
 const allTodos = () => [...S.todos, ...S.reminders];
-const allRows = () => [...S.todos, ...S.reminders, ...S.developments];
+const allRows = () => [...S.todos, ...S.reminders, ...S.developments, ...S.events];
 const initialsList = s => String(s||"").toUpperCase().split(/[\/,&;]|\s+and\s+|\s+/).map(x=>x.trim()).filter(Boolean);
 function myInitials(){ return ((S.session && S.session.initials) || "").toUpperCase(); }
 function statusPill(st){ st=STATUSES.includes(st)?st:"Active"; return `<span class="pill s-${st}" title="${esc(STATUS_HELP[st])}">${st}</span>`; }
@@ -421,7 +447,7 @@ function todoOverdue(t){ const n=daysUntil(t.due); return !t.done && n!=null && 
 function sortTodos(list){ return list.sort((a,b)=>(a.done-b.done) || String(a.due||"9999").localeCompare(String(b.due||"9999")) || String(a.owner||"").localeCompare(String(b.owner||"")) || (a.createdAt||0)-(b.createdAt||0)); }
 
 /* ---------- routing ---------- */
-const VIEWS = ["week","projects","todos","archive","developments","meetings"];
+const VIEWS = ["week","projects","todos","archive","developments","calendar","meetings"];
 function parseHash(){ let h=(location.hash||"").replace(/^#/,""); try{ h=decodeURIComponent(h); }catch{} const m=h.match(/^(project|todo|meeting)\/(.+)$/); return m?{kind:m[1],id:m[2]}:{view:h}; }
 function route(){
   const r=parseHash();
@@ -453,7 +479,7 @@ function render(){
   document.querySelectorAll("nav.tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.view===S.view ? "page" : "false"));
   const mine=S.todos.filter(t=>!t.done && myInitials() && initialsList(t.owner).includes(myInitials())).length;
   document.getElementById("tagTodos").textContent = mine ? `${mine} yours` : "";
-  const html = TABLES.some(t=>!S.loaded[t]) ? "" : S.view==="projects" ? renderProjects() : S.view==="todos" ? renderTodos() : S.view==="archive" ? renderArchive() : S.view==="developments" ? renderDevelopments() : S.view==="meetings" ? renderMeetings() : renderWeek();
+  const html = TABLES.some(t=>!S.loaded[t]) ? "" : S.view==="projects" ? renderProjects() : S.view==="todos" ? renderTodos() : S.view==="archive" ? renderArchive() : S.view==="developments" ? renderDevelopments() : S.view==="calendar" ? renderCalendar() : S.view==="meetings" ? renderMeetings() : renderWeek();
   const ae=document.activeElement, aid=ae&&ae.id, pos=ae&&ae.selectionStart;
   v.innerHTML = statusBanner() + html;
   if(aid){ const e=document.getElementById(aid); if(e && e!==document.activeElement && /^(q|aq|tq|dq)$/.test(aid)){ e.focus(); try{ e.setSelectionRange(pos,pos); }catch{} } }
@@ -491,7 +517,7 @@ function renderWeek(){
   <section class="cols">
     <div><h3 class="sec">To-dos for the week <span class="n">${due.length}</span></h3>${todoListHTML(due, {showProject:true})}
       ${later?`<p class="t2" style="margin-top:6px"><a href="#todos">${later} more due later</a></p>`:""}</div>
-    <div><h3 class="sec">What changed</h3>${changesHTML()}</div>
+    <div><h3 class="sec">Coming up <span class="n">next 30 days</span></h3>${comingUpHTML()}<h3 class="sec" style="margin-top:18px">What changed</h3>${changesHTML()}</div>
   </section>
   <div class="weekgrid"><div>${S.projects.length ? projectTableHTML(open, {grouped:true}) : emptyStart()}</div>${remindersPanelHTML()}</div>
   <p class="source">Source: Corp Dev weekly meetings${lm?`; last meeting ${esc(fmtDate(lm.date))}`:""}. Statuses: Active (ongoing), Pending (no update, or waiting on someone else).</p>`;
@@ -690,6 +716,85 @@ function renderMeetings(){
     :`<div class="empty"><p>No meetings yet. Import a transcript after your next weekly meeting, or import the workbook to bring in past weeks.</p></div>`}`;
 }
 
+/* Calendar: company-wide events and holidays (to-dos with kind "event": text, type, date, endDate, location, notes) */
+const tcls = t => "et-"+String(EVENT_TYPES.includes(t)?t:"Other").replace(/\s+/g,"-");
+const evEnd = e => e.endDate && e.endDate>e.date ? e.endDate : e.date;
+const evOn = (e,d) => e.date<=d && d<=evEnd(e);
+function evWhen(e){ return fmtDate(e.date)+(e.endDate&&e.endDate>e.date?` to ${fmtDate(e.endDate)}`:""); }
+function comingUpHTML(){
+  const today=TODAY(), until=addDays(today,30);
+  const list=S.events.filter(e=>evEnd(e)>=today && e.date<=until).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8);
+  if(!list.length) return `<p class="t2">Nothing on the calendar. <a href="#calendar">Open the calendar</a></p>`;
+  return `<ul class="mlist">${list.map(e=>`<li class="click" data-act="open-todo" data-id="${esc(e.id)}" tabindex="0"><span class="d">${esc(fmtDate(e.date))}</span><div><p><b>${esc(e.text)}</b></p><p class="meta"><span class="${tcls(e.type)}">&#9632;</span> ${esc(e.type||"Other")}${e.endDate&&e.endDate>e.date?` &middot; to ${esc(fmtDate(e.endDate))}`:""}${e.location?` &middot; ${esc(e.location)}`:""}</p></div></li>`).join("")}</ul>`;
+}
+function monthStr(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+function renderCalendar(){
+  const ym=S.calMonth||monthStr(new Date()), [y,m]=ym.split("-").map(Number);
+  const first=new Date(y,m-1,1), daysIn=new Date(y,m,0).getDate(), lead=(first.getDay()+6)%7, weeks=Math.ceil((lead+daysIn)/7);
+  const today=TODAY(), monthStart=`${ym}-01`, monthEnd=`${ym}-${String(daysIn).padStart(2,"0")}`;
+  const evs=S.events.filter(e=>S.etype==="all"||(e.type||"Other")===S.etype).sort((a,b)=>a.date.localeCompare(b.date)||String(a.text).localeCompare(String(b.text)));
+  let cells="";
+  for(let i=0;i<weeks*7;i++){ const d=new Date(y,m-1,1-lead+i), ds=iso(d), out=d.getMonth()!==m-1, wk=d.getDay()===0||d.getDay()===6;
+    const on=evs.filter(e=>evOn(e,ds));
+    cells+=`<div class="day${out?" out":""}${wk&&!out?" wkend":""}${ds===today?" today":""}" aria-label="${esc(d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"}))}"><span class="dn">${d.getDate()}</span>
+      ${on.slice(0,3).map(e=>`<button type="button" class="ev ${tcls(e.type)}${e.date<ds?" cont":""}" data-act="open-todo" data-id="${esc(e.id)}" title="${esc(e.text)} (${esc(e.type||"Other")}, ${esc(evWhen(e))})">${e.date<ds&&i%7!==0?"&hellip; ":""}${esc(e.text)}</button>`).join("")}
+      ${on.length>3?`<span class="evmore">+${on.length-3} more</span>`:""}</div>`; }
+  const month=evs.filter(e=>e.date<=monthEnd && evEnd(e)>=monthStart);
+  const label=first.toLocaleDateString("en-GB",{month:"long",year:"numeric"});
+  const chip=(v,l,n)=>`<button type="button" class="fchip" data-act="etype" data-v="${esc(v)}" aria-pressed="${S.etype===v}">${v==="all"?"":`<span class="sw ${tcls(v)}" style="width:8px;height:8px;background:currentColor;display:inline-block"></span>`}${esc(l)}<b>${n}</b></button>`;
+  const all=S.events.filter(e=>e.date<=monthEnd && evEnd(e)>=monthStart);
+  return `
+  <section class="pagehead"><div><h2 class="action-title">Calendar</h2><p class="sub">Company-wide events and holidays: town halls, strategy days, offsites, conferences, board meetings. Claude adds dated events it hears in the meeting transcripts; you can add them here too.</p></div>
+    <div class="headacts"><button class="btn accent" data-act="import-tr">Import transcript</button></div></section>
+  <form class="addev" id="addEvForm" aria-label="Add an event"><label>Event<input type="text" id="ne_text" placeholder="e.g. Global town hall"></label><label>Type${sel("ne_type",EVENT_TYPES,"Town hall")}</label>
+    <label>Date<input type="date" id="ne_date" value=""></label><label>End date <span class="t2" style="font-weight:normal">(if more than a day)</span><input type="date" id="ne_end"></label><button class="btn primary">Add event</button></form>
+  <div class="calhead"><h3>${esc(label)}</h3><button type="button" class="btn sm" data-act="cal-month" data-v="-1" aria-label="Previous month">&lsaquo; Previous</button><button type="button" class="btn sm" data-act="cal-month" data-v="0">Today</button><button type="button" class="btn sm" data-act="cal-month" data-v="1" aria-label="Next month">Next &rsaquo;</button></div>
+  <div class="fchips" role="group" aria-label="Event type">${chip("all","All types",all.length)}${EVENT_TYPES.map(t=>chip(t,t,all.filter(e=>(e.type||"Other")===t).length)).filter((c,i)=>all.some(e=>(e.type||"Other")===EVENT_TYPES[i])||S.etype===EVENT_TYPES[i]).join("")}</div>
+  <div class="calgrid" role="grid" aria-label="${esc(label)}">${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>`<div class="dow">${d}</div>`).join("")}${cells}</div>
+  <div class="evlegend" aria-hidden="true">${EVENT_TYPES.map(t=>`<span class="${tcls(t)}"><i></i><span style="color:var(--ink)">${esc(t)}</span></span>`).join("")}</div>
+  <section><h3 class="sec">${esc(label)} <span class="n">${month.length}</span></h3>${month.length?`<ul class="mlist agenda">${month.map(e=>`<li class="click" data-act="open-todo" data-id="${esc(e.id)}" tabindex="0"><span class="d">${esc(evWhen(e))}</span><div><p><b>${esc(e.text)}</b></p><p class="meta"><span class="${tcls(e.type)}">&#9632;</span> ${esc(e.type||"Other")}${e.location?` &middot; ${esc(e.location)}`:""}${e.notes?` &middot; ${esc(e.notes)}`:""}</p></div></li>`).join("")}</ul>`:`<p class="t2">Nothing on the calendar this month.</p>`}</section>`;
+}
+function eventFormHTML(dr,t){
+  return `${drHead("Calendar event", esc(t.text||"Event"), dr.id?savedLine(t):"")}
+  <form class="drawer-b" id="todoForm" novalidate>
+    <div id="drAlert" role="alert"></div>
+    <div class="fgrid">
+      <label class="f full">Event<input type="text" id="f_text" value="${esc(t.text||"")}"></label>
+      <label class="f">Type${sel("f_etype",EVENT_TYPES,t.type||"Other")}</label>
+      <label class="f">Location <em>(optional)</em><input type="text" id="f_location" value="${esc(t.location||"")}"></label>
+      <label class="f">Date<input type="date" id="f_date" value="${esc(t.date||"")}"></label>
+      <label class="f">End date <em>(if more than a day)</em><input type="date" id="f_endDate" value="${esc(t.endDate||"")}"></label>
+      <label class="f full">Notes<textarea id="f_notes" rows="3">${esc(t.notes||"")}</textarea></label>
+    </div>
+    <div><button type="button" class="btn sm" data-act="ev-ics" data-id="${esc(dr.id||"")}">Add to my Outlook calendar</button></div>
+    ${t.quote?`<p class="source">From the transcript: "${esc(t.quote)}"</p>`:""}
+    ${t.meetingDate?`<p class="t2" style="margin:0">From the meeting on ${esc(fmtDate(t.meetingDate))}.</p>`:""}
+    <div><h3 class="sec">History</h3><ul class="mlist hist" id="histList"></ul></div>
+  </form>
+  <div class="drawer-f">${dr.confirmDelete?`<span class="over">Delete this event?</span><button class="btn danger sm" data-act="del-yes">Delete</button><button class="btn sm" data-act="del-no">Keep</button>`:`<button class="btn danger" data-act="del-ask">Delete</button>`}
+    <span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="save-todo">Save changes</button></div>`;
+}
+async function addEvent({text, type, date, endDate, location, notes, quote, meetingId, meetingDate}, {quiet}={}){
+  text=String(text||"").trim(); if(!text){ toast("Give the event a name."); return false; }
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||""))){ toast("Choose the event's date."); return false; }
+  const body={kind:"event", text, type:EVENT_TYPES.includes(type)?type:"Other", date, endDate:endDate&&endDate>date?endDate:"", location:location||"", notes:notes||"", quote:quote||"", done:false,
+    meetingId:meetingId||"", meetingDate:meetingDate||"", createdAt:Date.now(), createdBy:S.meId||"", ...meta()};
+  if(quiet){ await S.db.collection("todos").doc("e"+uid()).set(body,{quiet:true}); return true; }
+  const ok=await guard(()=>S.db.collection("todos").doc("e"+uid()).set(body), "Event added");
+  if(ok){ S.calMonth=date.slice(0,7); render(); }
+  return ok;
+}
+function eventIcs(e){
+  const d=x=>x.replace(/-/g,""), end=addDays(evEnd(e),1);
+  const esc2=v=>String(v||"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
+  const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Ascot Group//Corp Dev tracker//EN","METHOD:PUBLISH","BEGIN:VEVENT","UID:"+e.id+"@corpdev-tracker",
+    "DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,""),"DTSTART;VALUE=DATE:"+d(e.date),"DTEND;VALUE=DATE:"+d(end),"TRANSP:TRANSPARENT",
+    "SUMMARY:"+esc2(e.text),...(e.location?["LOCATION:"+esc2(e.location)]:[]),"DESCRIPTION:"+esc2([e.type, e.notes].filter(Boolean).join(". ")),"END:VEVENT","END:VCALENDAR"];
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([L.join("\r\n")+"\r\n"],{type:"text/calendar;charset=utf-8"}));
+  a.download=String(e.text).replace(/[^\w.-]+/g,"-").slice(0,60)+".ics"; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
+  toast("Calendar file downloaded. Open it to add the event to Outlook.");
+}
+
 /* Key developments: things discussed that aren't about a project on the list (to-dos with kind "development") */
 function devCardsHTML(list){
   return `<div class="devs">${list.map(d=>`<div class="dev" data-act="open-todo" data-id="${esc(d.id)}" tabindex="0"><div class="dh"><span class="topic">${esc(d.topic||"Other")}</span><b>${esc(d.text||"")}</b></div>${d.notes?`<p>${esc(d.notes)}</p>`:""}</div>`).join("")}</div>`;
@@ -839,6 +944,7 @@ function projectFormValues(){
 function todoFormHTML(dr){
   const isNew=!dr.id; const t = isNew ? (dr.seed||{}) : (dr.orig||allRows().find(x=>x.id===dr.id)||{}); const rem=t.kind==="reminder", dev=t.kind==="development";
   if(dev) return developmentFormHTML(dr,t);
+  if(t.kind==="event") return eventFormHTML(dr,t);
   const projs=[...S.projects].sort((a,b)=>(isOpen(b)-isOpen(a))||String(a.name).localeCompare(String(b.name)));
   return `${drHead(rem?"Reminder":isNew?"New to-do":"To-do", esc(rem?`Follow up with ${t.person||"someone"}`:t.text||"New to-do"), isNew?"":savedLine(t))}
   <form class="drawer-b" id="todoForm" novalidate>
@@ -860,7 +966,8 @@ function todoFormHTML(dr){
   <div class="drawer-f">${isNew?"":(dr.confirmDelete?`<span class="over">Delete this to-do?</span><button class="btn danger sm" data-act="del-yes">Delete</button><button class="btn sm" data-act="del-no">Keep</button>`:`<button class="btn danger" data-act="del-ask">Delete</button>`)}
     <span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="save-todo">${isNew?"Add to-do":"Save changes"}</button></div>`;
 }
-function todoFormValues(){ if(document.getElementById("f_topic")) return {text:val("f_text"), topic:val("f_topic"), notes:val("f_notes")};
+function todoFormValues(){ if(document.getElementById("f_etype")){ const d=val("f_date"), e=val("f_endDate"); return {text:val("f_text"), type:val("f_etype"), date:d, endDate:e&&e>d?e:"", location:val("f_location"), notes:val("f_notes")}; }
+  if(document.getElementById("f_topic")) return {text:val("f_text"), topic:val("f_topic"), notes:val("f_notes")};
   return {...(document.getElementById("f_person")?{person:val("f_person")}:{}), text:val("f_text"), owner:val("f_owner").toUpperCase(), due:val("f_due"), projectId:val("f_projectId"), done:!!document.getElementById("f_done")?.checked, notes:val("f_notes")}; }
 
 /* Meeting snapshot */
@@ -1176,6 +1283,7 @@ function prepareReview(p){
     t:(p.todos||[]).map(x=>({...x, take:true})),
     r:(p.reminders||[]).map(x=>({...x, take:true})),
     k:(p.developments||[]).map(x=>({...x, take:true})),
+    e:(p.events||[]).map(x=>({...x, take:!S.events.some(v=>v.date===x.date&&String(v.text).toLowerCase()===String(x.title).toLowerCase()), dupe:S.events.some(v=>v.date===x.date&&String(v.text).toLowerCase()===String(x.title).toLowerCase())})),
     d:(p.todos_done||[]).map(x=>({...x, take:true}))};
 }
 function reviewHTML(dr){
@@ -1186,7 +1294,7 @@ function reviewHTML(dr){
   const selr=(k,i,f,opts,blank)=>`<select data-rv="${k}.${i}.${f}" aria-label="${esc(f)}">${blank!=null?`<option value="">${esc(blank)}</option>`:""}${opts.map(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; return `<option value="${esc(v)}"${v===rv[k][i][f]?" selected":""}>${esc(l)}</option>`; }).join("")}</select>`;
   const pname=id=>(projById(id)||{}).name||"A project";
   const projOpts=[...S.projects.filter(isOpen).map(p=>[p.id,p.name]), ...rv.n.filter(n=>n.take&&n.name).map(n=>[n.name,n.name+" (new)"])];
-  const total=["u","n","a","t","r","k","d"].reduce((s,k)=>s+rv[k].filter(x=>x.take).length,0);
+  const total=["u","n","a","t","r","k","e","d"].reduce((s,k)=>s+rv[k].filter(x=>x.take).length,0);
   const sec=(title,n,inner)=>`<div><h3 class="sec">${title} <span class="n">${n}</span></h3>${n?`<div style="display:flex;flex-direction:column;gap:10px">${inner}</div>`:`<p class="t2">None.</p>`}</div>`;
   return `<div class="drawer-b" id="rvBody">
     <div class="banner"><span>Meeting on <b>${esc(fmtDate(dr.date))}</b>. Untick anything you don't want, edit anything that's off, then save. ${rv.summary?`<br>${esc(rv.summary)}`:""}</span></div>
@@ -1218,6 +1326,9 @@ function reviewHTML(dr){
     ${sec("Key developments", rv.k.length, rv.k.map((k,i)=>`<div class="rv${k.take?"":" off"}" style="border-left-color:var(--lblue)"><div class="rh">${box("k",i,"Add to key developments")}</div>
         <div class="rvgrid"><label class="f full">Headline${inp("k",i,"title","Headline")}</label><label class="f">Topic${selr("k",i,"topic",DEV_TOPICS)}</label><span></span><span></span>
           <label class="f full">Detail${ta("k",i,"detail",2)}</label></div>${k.quote?`<div class="why">"${esc(k.quote)}"</div>`:""}</div>`).join(""))}
+    ${sec("Calendar events", rv.e.length, rv.e.map((ev,i)=>`<div class="rv${ev.take?"":" off"}" style="border-left-color:var(--teal)"><div class="rh">${box("e",i,"Add to the calendar")}${ev.dupe?`<span class="t2">Already on the calendar</span>`:""}</div>
+        <div class="rvgrid"><label class="f full">Event${inp("e",i,"title","Event")}</label><label class="f">Type${selr("e",i,"type",EVENT_TYPES)}</label><label class="f">Date${inp("e",i,"date","Date","date")}</label><label class="f">End date${inp("e",i,"end_date","End date","date")}</label>
+          ${ev.notes?`<label class="f full">Notes${inp("e",i,"notes","Notes")}</label>`:""}</div>${ev.quote?`<div class="why">"${esc(ev.quote)}"</div>`:""}</div>`).join(""))}
     ${sec("Open to-dos and reminders the meeting said are done", rv.d.length, rv.d.map((d,i)=>{ const t=allTodos().find(x=>x.id===d.todo_id)||{}; return `<div class="rv a${d.take?"":" off"}"><div class="rh">${box("d",i,`Mark done: ${esc(t.kind==="reminder"?`follow up with ${t.person||""}${t.text?`: ${t.text}`:""}`:t.text||"to-do")}`)}</div>${d.reason?`<div class="why">${esc(d.reason)}</div>`:""}</div>`; }).join(""))}
   </div>
   <div class="drawer-f"><button class="btn" data-act="tr-back">Back</button><span class="sp"></span><span class="t2">${total} change${total===1?"":"s"} selected</span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="tr-save">Save and record the meeting</button></div>`;
@@ -1251,6 +1362,8 @@ async function applyReview(){
     for(const k of rv.k.filter(x=>x.take&&String(x.title||x.detail).trim())){
       await S.db.collection("todos").doc("k"+uid()).set({kind:"development", text:String(k.title||"").trim()||String(k.detail).trim().slice(0,120), notes:String(k.detail||"").trim(), topic:DEV_TOPICS.includes(k.topic)?k.topic:"Other", quote:k.quote||"", done:false,
         meetingId:mid, meetingDate:date, createdAt:Date.now(), createdBy:S.meId||"", ...m},{quiet:true}); made++; }
+    for(const ev of rv.e.filter(x=>x.take&&String(x.title).trim()&&/^\d{4}-\d{2}-\d{2}$/.test(x.date))){
+      await addEvent({text:ev.title, type:ev.type, date:ev.date, endDate:ev.end_date, notes:ev.notes, quote:ev.quote, meetingId:mid, meetingDate:date},{quiet:true}); made++; }
     for(const d of rv.d.filter(x=>x.take)){ try{ await S.db.collection("todos").doc(d.todo_id).update({done:true, doneAt:date, ...m},{quiet:true}); made++; }catch(e){ if(!(e&&e.code==="not_found")) throw e; } }
     await refetch("projects"); await refetch("todos");
     await saveMeeting(date,{summary:rv.summary, source:"transcript"});
@@ -1347,7 +1460,8 @@ async function exportWorkbook(){
   X.utils.book_append_sheet(wb, sheet([["Project","Description","Stakeholders","Corp Dev","Status","Last update","Closed"], ...S.projects.filter(p=>!isOpen(p)).sort((a,b)=>String(b.closedAt||"").localeCompare(String(a.closedAt||""))).map(p=>[p.name,p.description||"",p.stakeholders||"",p.corpDev||"",p.status,p.update||"",p.closedAt||""])],[30,50,22,16,10,60,12]), "Old Projects");
   X.utils.book_append_sheet(wb, sheet([["Who","Follow up with","About","Project","By","Done","From meeting"], ...sortTodos([...S.reminders]).map(t=>[t.owner||"", t.person||"", t.text||"", (projById(t.projectId)||{}).name||"", t.due||"", t.done?"Yes":"", t.meetingDate||""])],[8,26,50,30,12,6,14]), "Reminders");
   X.utils.book_append_sheet(wb, sheet([["Date","Topic","Headline","Detail"], ...[...S.developments].sort((a,b)=>devDate(b).localeCompare(devDate(a))).map(d=>[devDate(d), d.topic||"Other", d.text||"", d.notes||""])],[12,18,50,80]), "Key developments");
-  const used=new Set(["Current","To-dos","Reminders","Key developments","Old Projects"]);
+  X.utils.book_append_sheet(wb, sheet([["Date","End date","Event","Type","Location","Notes"], ...[...S.events].sort((a,b)=>a.date.localeCompare(b.date)).map(e=>[e.date, e.endDate||"", e.text, e.type||"Other", e.location||"", e.notes||""])],[12,12,40,16,20,50]), "Calendar");
+  const used=new Set(["Current","To-dos","Reminders","Key developments","Calendar","Old Projects"]);
   for(const mt of [...S.meetings].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,26)){
     const [y,mo,da]=mt.date.split("-"); let nm=`${mo}.${da}.${y.slice(2)}`; if(used.has(nm)) continue; used.add(nm);
     X.utils.book_append_sheet(wb, sheet([["","Project","Description","Stakeholders","Corp Dev","Status",`${us(mt.date)} Update`], ...grouped((mt.snapshot||[]).map(s=>({...s})))],[28,30,50,22,16,10,60]), nm);
@@ -1377,9 +1491,11 @@ document.addEventListener("click", async e=>{
       if(await guard(async()=>{ const a=await S.sb.from("settings").upsert({id:"claude", doc:{...(S.settings.claude||{}), autoCategory:on}}); if(a.error) throw a.error;
           const b=await S.sb.from("settings").upsert({id:"contacts", doc:{list:pc.list}}); if(b.error) throw b.error; await loadSettings(); render(); }, `Settings saved (${pc.list.length} contact${pc.list.length===1?"":"s"})`)) closeDrawer();
       else if(t.isConnected) t.disabled=false; break; }
+    case "cal-month": { const v=+t.dataset.v; if(!v) S.calMonth=""; else { const [y,m]=(S.calMonth||monthStr(new Date())).split("-").map(Number); S.calMonth=monthStr(new Date(y,m-1+v,1)); } render(); document.querySelector(`[data-act="cal-month"][data-v="${v}"]`)?.focus(); break; }
+    case "ev-ics": { const e=S.events.find(x=>x.id===id); if(e) eventIcs({...e, text:val("f_text")||e.text, date:val("f_date")||e.date, endDate:val("f_endDate"), location:val("f_location"), notes:val("f_notes")}); break; }
     case "cal-open": await openCalendar(id, +t.dataset.h, "outlook"); break;
     case "cal-ics": await openCalendar(id, +t.dataset.h, "ics"); break;
-    case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "af": case "dtopic": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
+    case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "af": case "dtopic": case "etype": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
     case "open-project": goRecord("project",id); break;
     case "open-project-snap": if(id&&projById(id)){ S.drawer=null; goRecord("project",id); } break;
     case "open-todo": goRecord("todo",id); break;
@@ -1427,6 +1543,7 @@ document.addEventListener("keydown", e=>{
 document.addEventListener("submit", async e=>{ e.preventDefault();
   if(e.target.id==="loginForm"){ doLogin(); return; }
   if(e.target.id==="pwForm"){ savePassword(); return; }
+  if(e.target.id==="addEvForm"){ if(await addEvent({text:val("ne_text"), type:val("ne_type"), date:val("ne_date"), endDate:val("ne_end")})){ ["ne_text","ne_date","ne_end"].forEach(i=>{ const x=document.getElementById(i); if(x) x.value=""; }); } return; }
   if(e.target.id==="addDevForm"){ if(await addDevelopment({text:val("nd_text"), topic:val("nd_topic"), notes:val("nd_notes")})){ ["nd_text","nd_notes"].forEach(i=>{ const x=document.getElementById(i); if(x) x.value=""; }); document.getElementById("nd_text")?.focus(); } return; }
   if(e.target.id==="addRemForm"){ if(await addReminder({person:val("nr_person"), text:val("nr_text"), owner:""})){ const x=document.getElementById("nr_person"); if(x){ x.value=""; x.focus(); } } return; }
   if(e.target.id==="addTodoForm"){ if(await addTodo({text:val("nt_text"), owner:val("nt_owner"), due:val("nt_due")})){ const x=document.getElementById("nt_text"); if(x){ x.value=""; x.focus(); } } }
@@ -1452,7 +1569,7 @@ async function refetch(table){
   const {data, error}=await S.sb.from(table).select("id,doc,updated_at,updated_by");
   if(error){ if(!S.loaded[table]) toast("Couldn't load the tracker: "+error.message); return; }
   const rows=(data||[]).map(r=>({...(r.doc||{}), id:r.id, _v:r.updated_at, _by:r.updated_by}));
-  if(table==="todos"){ S.reminders=rows.filter(r=>r.kind==="reminder"); S.developments=rows.filter(r=>r.kind==="development"); S.todos=rows.filter(r=>r.kind!=="reminder"&&r.kind!=="development"); } else S[table]=rows;
+  if(table==="todos"){ S.reminders=rows.filter(r=>r.kind==="reminder"); S.developments=rows.filter(r=>r.kind==="development"); S.events=rows.filter(r=>r.kind==="event"); S.todos=rows.filter(r=>!["reminder","development","event"].includes(r.kind)); } else S[table]=rows;
   if(table==="projects") S.projects.forEach(p=>{ if(!STATUSES.includes(p.status)) p.status="Active"; });
   S.loaded[table]=true; if(TABLES.every(t=>S.loaded[t])) clearTimeout(startData.timer);
   if(table==="projects" && S.changes && !S.changes.loading) S.changes=null;
