@@ -171,6 +171,10 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   const p4 = await doc(p, "projects", "p4");
   ok("completed project gets a closed date", p4.status === "Completed" && !!p4.closedAt, p4);
   await p.goto(BASE + "#archive"); await p.waitForTimeout(300);
+  ok("archive shows each project's category", (await p.textContent('tr[data-id="p5"]')).includes("External growth"));
+  await p.click('.fchip[data-act="acat"][data-v="Other Projects"]');
+  ok("archive category filter", (await p.$$eval("tbody tr[data-id]", x => x.map(e => e.dataset.id).join(","))) === "p4");
+  await p.click('.fchip[data-act="acat"][data-v="all"]');
   ok("archive lists completed and dropped", (await p.$$eval("tbody tr[data-id]", x => x.map(e => e.dataset.id).sort().join(","))) === "p4,p5");
 
   // conflict: someone else edits the same field while the drawer is open

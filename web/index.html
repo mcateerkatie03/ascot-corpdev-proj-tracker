@@ -622,7 +622,7 @@ function projectTableHTML(list, {grouped, archive, noDate}={}){
   const cats=[...CATEGORIES, NO_CAT];
   const sorted=[...list].sort((a,b)=>cats.indexOf(catOf(a))-cats.indexOf(catOf(b)) || String(a.quarter||"").localeCompare(String(b.quarter||"")) || (a.order??1e9)-(b.order??1e9) || String(a.name).localeCompare(String(b.name)));
   const row = p => `<tr class="click" data-act="open-project" data-id="${esc(p.id)}" tabindex="0">
-    <td><div class="t1">${esc(p.name)}${archive?"":projTags(p)}</div>${p.quarter?`<div class="t2">${esc(p.quarter)}</div>`:""}${p.stage&&catOf(p)===EXTERNAL?`<span class="stage">Deal stage: ${esc(p.stage)}</span>`:""}
+    <td><div class="t1">${esc(p.name)}${archive?"":projTags(p)}</div>${archive?`<div class="t2">${esc(CAT_SHORT[catOf(p)]||catOf(p))}</div>`:""}${p.quarter?`<div class="t2">${esc(p.quarter)}</div>`:""}${p.stage&&catOf(p)===EXTERNAL?`<span class="stage">Deal stage: ${esc(p.stage)}</span>`:""}
       ${p.description?`<div class="t2 mob">${esc(p.description)}</div>`:""}</td>
     <td class="c-side">${statusPill(p.status)}${archive&&p.closedAt?`<div class="t2">${esc(fmtDate(p.closedAt))}</div>`:""}</td>
     <td class="desc c-hide"><div class="clamp prose">${esc(p.description||"")||'<span class="t2">No description</span>'}</div></td>
@@ -694,12 +694,14 @@ function renderTodos(){
 /* Archive: completed and dropped projects (the Old Projects tab) */
 function renderArchive(){
   const base=searched(S.projects.filter(p=>!isOpen(p)), S.aq);
-  const f=S.af||"all"; const rows=base.filter(p=>f==="all"||p.status===f).sort((a,b)=>String(b.closedAt||"").localeCompare(String(a.closedAt||"")));
+  const f=S.af||"all", ac=S.acat||"all"; const byStatus=base.filter(p=>f==="all"||p.status===f);
+  const rows=byStatus.filter(p=>ac==="all"||catOf(p)===ac).sort((a,b)=>String(b.closedAt||"").localeCompare(String(a.closedAt||"")));
   const chip=(v,l,n)=>`<button type="button" class="fchip" data-act="af" data-v="${v}" aria-pressed="${f===v}">${l}<b>${n}</b></button>`;
   return `
   <section class="pagehead"><div><h2 class="action-title">Archive</h2><p class="sub">Completed projects (finished or sent out) and dropped projects (taken off the list without finishing). Open one to restore it.</p></div></section>
   <section class="toolbar"><div class="grow"><input type="search" id="aq" placeholder="Search the archive" aria-label="Search the archive" value="${esc(S.aq)}"></div></section>
   <div class="fchips">${chip("all","All",base.length)}${chip("Completed","Completed",base.filter(p=>p.status==="Completed").length)}${chip("Dropped","Dropped",base.filter(p=>p.status==="Dropped").length)}</div>
+  <div class="fchips" role="group" aria-label="Category">${[["all","All categories"],...[...CATEGORIES,NO_CAT].map(c=>[c,CAT_SHORT[c]||c])].filter(([v])=>v==="all"||v===ac||byStatus.some(p=>catOf(p)===v)).map(([v,l])=>`<button type="button" class="fchip" data-act="acat" data-v="${esc(v)}" aria-pressed="${ac===v}">${esc(l)}<b>${v==="all"?byStatus.length:byStatus.filter(p=>catOf(p)===v).length}</b></button>`).join("")}</div>
   ${projectTableHTML(rows,{archive:true})}
   <p class="source">${rows.length} archived project${rows.length===1?"":"s"} shown.</p>`;
 }
@@ -1494,7 +1496,7 @@ document.addEventListener("click", async e=>{
     case "ev-ics": { const e=S.events.find(x=>x.id===id); if(e) eventIcs({...e, text:val("f_text")||e.text, date:val("f_date")||e.date, endDate:val("f_endDate"), location:val("f_location"), notes:val("f_notes")}); break; }
     case "cal-open": await openCalendar(id, +t.dataset.h, "outlook"); break;
     case "cal-ics": await openCalendar(id, +t.dataset.h, "ics"); break;
-    case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "af": case "dtopic": case "etype": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
+    case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "af": case "acat": case "dtopic": case "etype": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
     case "open-project": goRecord("project",id); break;
     case "open-project-snap": if(id&&projById(id)){ S.drawer=null; goRecord("project",id); } break;
     case "open-todo": goRecord("todo",id); break;
