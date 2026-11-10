@@ -4,6 +4,7 @@ The Corporate Development team's weekly project list, kept up to date from the t
 
 - **This week:** the dashboard. Tiles for active and pending projects and open to-dos, the week's to-dos, what changed, and every open project grouped by category with its description, status and this week's update.
 - **Reminders:** a panel beside the dashboard's project table listing people to follow up with ("schedule a meeting with…", "check with… when he's back in New York"). Claude picks them out of each transcript; you can add or tick them off by hand.
+- **Emailed reminders:** open a reminder, pick a name from your contacts list (Settings) and choose **Email in 24 hours** or **in 48 hours**. A scheduled job sends it from an Ascot address through Resend within about 10 minutes of the time. Only names are shown in the tracker; email addresses are kept in the database and listed only under Settings.
 - **Projects:** the whole list, filterable by status, category and Corp Dev initials. Open a project to edit it, add links and to-dos, or see its history.
 - **To-dos:** the week's action items with owner, project and due date. Unfinished ones carry forward until they're ticked off. Filters for *Mine*, *Overdue* and *Due this week*.
 - **Archive:** completed and dropped projects (the workbook's Old Projects tab). Any project can be restored.
@@ -132,6 +133,12 @@ Every Monday morning the team gets an email with overdue to-dos, to-dos due that
    ```
 
 5. Schedule it: open `supabase/digest_schedule.sql`, replace the two placeholders (your function address and the same `DIGEST_SECRET`), and run it in the SQL editor. It sends on Mondays at 07:17 UTC; edit the schedule line to change that.
+
+## Emailed reminders
+
+The `send-reminders` function runs every 10 minutes (`supabase/reminders_schedule.sql`) and emails any reminder whose 24 or 48 hours are up, to the contact chosen on the site. It can only email people on the contacts list, sends nothing for reminders that were ticked off, and gives up on any that are more than 3 days late.
+
+To switch sending on: verify the sending domain in [Resend](https://resend.com) (Ascot IT adds the DNS records Resend lists), create an API key, then set the function's secrets `RESEND_API_KEY` and `REMINDER_FROM` (for example `Corp Dev tracker <tracker@yourco.com>`). `REMINDER_SECRET` and `SITE_URL` are already set. Until then, emails stay scheduled.
 
 ## Running locally
 

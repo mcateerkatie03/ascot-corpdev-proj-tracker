@@ -115,8 +115,15 @@ footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-bl
 .remdone .todos{margin-top:4px}
 .reminders .todo .due{grid-column:2;text-align:left}
 .rem .rwho{color:var(--purple)}
-.addrem{display:grid;grid-template-columns:70px minmax(0,1fr);gap:6px;margin-top:10px}
-.addrem #nr_person,.addrem #nr_text{grid-column:1/-1}
+.mailtag{display:inline-block;font-size:11px;color:var(--purple);white-space:nowrap}
+.mailtag.sent{color:var(--teal)}.mailtag.failed{color:var(--magenta);font-weight:bold}
+.emailbox{background:var(--alt);border-left:4px solid var(--purple);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.emailbox h3{margin:0;font-size:14px}
+.emailbox .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.emailbox select{width:auto;min-width:200px;max-width:100%}
+.emailbox .st{font-size:13px}
+.emailbox .st.failed{color:var(--magenta)}
+.addrem{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
 .addrem .btn{justify-content:center}
 @media (max-width:1100px){.weekgrid{grid-template-columns:1fr}.reminders{position:static}}
 .rvrem{display:grid;grid-template-columns:24px minmax(0,1fr) minmax(0,1.5fr) minmax(0,1.1fr) 140px;gap:6px;align-items:start;padding:6px 0;border-bottom:1px solid var(--grid)}
@@ -487,12 +494,61 @@ function renderWeek(){
   <p class="source">Source: Corp Dev weekly meetings${lm?`; last meeting ${esc(fmtDate(lm.date))}`:""}. Statuses: Active (ongoing), Pending (no update, or waiting on someone else).</p>`;
 }
 
+/* Emailed reminders: contacts live in the settings row "contacts" ({list:[{id,name,email}]}); only names are shown,
+   except under Settings. A reminder stores emailTo (contact id), emailName, sendAt (ms) and emailStatus
+   ("scheduled" | "sending" | "sent" | "failed" | "cancelled"); supabase/functions/send-reminders sends it. */
+const EMAIL_RE = /^[^\s@<>()"',;:]+@[^\s@<>()"',;:]+\.[^\s@<>()"',;:]+$/;
+function contacts(){ const l=(S.settings.contacts&&Array.isArray(S.settings.contacts.list))?S.settings.contacts.list:[]; return l.filter(c=>c&&c.id&&c.name&&EMAIL_RE.test(c.email||"")).sort((a,b)=>a.name.localeCompare(b.name)); }
+function contactsText(){ return contacts().map(c=>`${c.name} (${c.email})`).join("\n"); }
+/* One per line: "First Last (name@company.com)". Keeps each person's id when their email is unchanged. */
+function parseContacts(text){
+  const old=contacts(), out=[], bad=[], seen=new Set();
+  for(const raw of String(text||"").split(/\r?\n/)){ const l=raw.trim(); if(!l) continue;
+    const m=l.match(/^(.+?)\s*[(<\[]\s*([^()<>\[\]\s]+@[^()<>\[\]\s]+)\s*[)>\]]\s*$/);
+    if(!m||!EMAIL_RE.test(m[2])){ bad.push(l); continue; }
+    const email=m[2].trim(), name=m[1].replace(/[,;:]+$/,"").trim(), key=email.toLowerCase(); if(seen.has(key)) continue; seen.add(key);
+    const prev=old.find(c=>c.email.toLowerCase()===key); out.push({id:prev?prev.id:"c"+uid(), name, email}); }
+  return {list:out, bad};
+}
+const emailReady = () => !!(S.settings.email && S.settings.email.ready);
+function fmtSend(ms){ const d=new Date(ms); return d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+" at "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}); }
+function mailTag(t){
+  if(!t.emailStatus) return "";
+  if(t.emailStatus==="scheduled"||t.emailStatus==="sending") return `<span class="mailtag" title="Email scheduled">&#9993; ${esc(t.emailName||"")} &middot; ${esc(fmtSend(t.sendAt))}</span>`;
+  if(t.emailStatus==="sent") return `<span class="mailtag sent">&#9993; Emailed ${esc(t.emailName||"")}</span>`;
+  if(t.emailStatus==="failed") return `<span class="mailtag failed" title="${esc(t.emailError||"")}">&#9993; Email not sent</span>`;
+  return "";
+}
+function emailBoxHTML(id){
+  const t=allRows().find(x=>x.id===id); if(!t) return "";
+  const cs=contacts(), st=t.emailStatus;
+  let status="";
+  if(st==="scheduled"||st==="sending") status=`<div class="st">&#9993; Will email <b>${esc(t.emailName||"")}</b> on <b>${esc(fmtSend(t.sendAt))}</b>.${t.done?" It won't go, because this reminder is ticked off.":""}</div>
+    <div class="row"><button type="button" class="btn sm" data-act="em-cancel" data-id="${esc(id)}">Cancel the email</button></div>`;
+  else if(st==="sent") status=`<div class="st">&#9993; Emailed <b>${esc(t.emailName||"")}</b> on ${esc(fmtSend(t.emailSentAt||t.sendAt))}.</div>`;
+  else if(st==="failed") status=`<div class="st failed">&#9993; The email to <b>${esc(t.emailName||"")}</b> wasn't sent: ${esc(t.emailError||"unknown error")}.</div>`;
+  else if(st==="cancelled") status=`<div class="st t2">The email to ${esc(t.emailName||"")} was cancelled${t.emailError?`: ${esc(t.emailError)}`:""}.</div>`;
+  const pick = cs.length ? `<div class="row"><select id="em_to" aria-label="Email this reminder to">${cs.map(c=>`<option value="${esc(c.id)}"${c.id===t.emailTo?" selected":""}>${esc(c.name)}</option>`).join("")}</select>
+      <button type="button" class="btn sm primary" data-act="em-send" data-h="24" data-id="${esc(id)}">Email in 24 hours</button><button type="button" class="btn sm" data-act="em-send" data-h="48" data-id="${esc(id)}">Email in 48 hours</button></div>`
+    : `<div class="st t2">No one to email yet. Add names under <a href="#" data-act="settings">Settings</a> (the menu under your initials).</div>`;
+  const scheduled = st==="scheduled"||st==="sending";
+  return `<div class="emailbox"><h3>Email this reminder</h3>${status}${scheduled?"":pick}
+    ${emailReady()?"":`<div class="t2">Email sending isn't switched on yet. Scheduled emails go out once it is, as long as that's within 3 days.</div>`}</div>`;
+}
+async function scheduleEmail(id, hours){
+  const c=contacts().find(x=>x.id===val("em_to")); if(!c){ toast("Choose who to email."); return; }
+  const sendAt=Date.now()+hours*3600000;
+  if(await guard(()=>S.db.collection("todos").doc(id).update({emailTo:c.id, emailName:c.name, sendAt, emailStatus:"scheduled", emailError:"", emailScheduledAt:Date.now(), ...meta()}), `Email to ${c.name} scheduled for ${fmtSend(sendAt)}`)) refreshEmailBox(id);
+}
+async function cancelEmail(id){ if(await guard(()=>S.db.collection("todos").doc(id).update({emailStatus:"cancelled", emailError:"", ...meta()}), "Email cancelled")) refreshEmailBox(id); }
+function refreshEmailBox(id){ const el=document.getElementById("emailBox"); if(el) el.innerHTML=emailBoxHTML(id); }
+
 /* Reminders: people to follow up with, picked out of the transcripts (to-dos with kind "reminder") */
 function remListHTML(list){
   if(!list.length) return `<p class="t2" style="margin:6px 0 0">Nothing to follow up on.</p>`;
   const lm=latestMeeting();
   return `<ul class="todos">${list.map(t=>{ const p=t.projectId&&projById(t.projectId), od=todoOverdue(t), carried=!t.done&&lm&&t.meetingDate&&t.meetingDate<lm.date;
-    const meta=[t.owner?`<span class="owner">${esc(t.owner)}</span>`:"", p?esc(p.name):"", carried?`<span class="carry">From ${esc(fmtDate(t.meetingDate))}</span>`:""].filter(Boolean).join(" ");
+    const meta=[t.owner?`<span class="owner">${esc(t.owner)}</span>`:"", p?esc(p.name):"", carried?`<span class="carry">From ${esc(fmtDate(t.meetingDate))}</span>`:"", t.done?"":mailTag(t)].filter(Boolean).join(" ");
     return `<li class="todo rem${t.done?" done":""}" data-id="${esc(t.id)}"><input type="checkbox" data-act="todo-done" data-id="${esc(t.id)}" ${t.done?"checked":""} aria-label="Done: follow up with ${esc(t.person||"")}">
       <div class="tx" data-act="open-todo" data-id="${esc(t.id)}" tabindex="0"><b>${t.person?`<span class="rwho">${esc(t.person)}</span>${t.text?": ":""}`:""}${esc(t.text||"")}</b>${meta?`<div class="meta">${meta}</div>`:""}</div>
       ${t.due?`<div class="due${od?" over":""}">${od?"Overdue: ":""}${esc(fmtDate(t.due))}</div>`:""}</li>`; }).join("")}</ul>`;
@@ -502,7 +558,7 @@ function remindersPanelHTML(){
   return `<aside class="reminders" aria-labelledby="remHead"><h3 id="remHead">Reminders <span class="t2">(${open.length})</span></h3>
     <p class="hint">People to follow up with, from the meetings. Tick one off once you've been in touch.</p>
     ${remListHTML(open)}${doneList.length?`<details class="remdone"${S.remShowDone?" open":""}><summary data-act="rem-showdone">Show done (${done} this week, ${doneList.length} in 30 days)</summary>${remListHTML(doneList)}</details>`:""}
-    <form class="addrem" id="addRemForm" aria-label="Add a reminder"><input type="text" id="nr_person" placeholder="Follow up with (name)" aria-label="Follow up with"><input type="text" id="nr_text" placeholder="About what, e.g. schedule a meeting" aria-label="About what"><input type="text" id="nr_owner" placeholder="Who" aria-label="Who follows up" value="${esc(myInitials())}" list="ownerListR"><button class="btn sm primary">Add reminder</button>
+    <form class="addrem" id="addRemForm" aria-label="Add a reminder"><input type="text" id="nr_person" placeholder="Follow up with (name)" aria-label="Follow up with"><input type="text" id="nr_text" placeholder="About what, e.g. schedule a meeting" aria-label="About what"><button class="btn sm primary">Add reminder</button>
       <datalist id="ownerListR">${teamInitials().map(i=>`<option value="${esc(i)}">`).join("")}</datalist></form></aside>`;
 }
 
@@ -769,12 +825,13 @@ function todoFormHTML(dr){
     <div class="fgrid">
       ${rem?`<label class="f full">Follow up with<input type="text" id="f_person" value="${esc(t.person||"")}"></label>`:""}
       <label class="f full">${rem?"About":"To-do"}<input type="text" id="f_text" value="${esc(t.text||"")}"></label>
-      <label class="f">Owner <em>(initials)</em><input type="text" id="f_owner" value="${esc(t.owner||"")}" list="ownerList2"><datalist id="ownerList2">${teamInitials().map(i=>`<option value="${esc(i)}">`).join("")}</datalist></label>
+      ${rem?"":`<label class="f">Owner <em>(initials)</em><input type="text" id="f_owner" value="${esc(t.owner||"")}" list="ownerList2"><datalist id="ownerList2">${teamInitials().map(i=>`<option value="${esc(i)}">`).join("")}</datalist></label>`}
       <label class="f">Due<input type="date" id="f_due" value="${esc(t.due||"")}"></label>
       <label class="f full">Project${sel("f_projectId",projs.map(p=>[p.id,p.name+(isOpen(p)?"":` (${p.status})`)]),t.projectId||"","No project")}</label>
       <label class="chk full"><input type="checkbox" id="f_done"${t.done?" checked":""}> Done</label>
       <label class="f full">Notes<textarea id="f_notes" rows="3">${esc(t.notes||"")}</textarea></label>
     </div>
+    ${rem&&!isNew?`<div id="emailBox">${emailBoxHTML(dr.id)}</div>`:""}
     ${t.quote?`<p class="source">From the transcript: "${esc(t.quote)}"</p>`:""}
     ${t.meetingDate?`<p class="t2" style="margin:0">Added from the meeting on ${esc(fmtDate(t.meetingDate))}.</p>`:""}
     ${isNew?"":`<div><h3 class="sec">History</h3><ul class="mlist hist" id="histList"></ul></div>`}
@@ -811,11 +868,17 @@ function snapshotHTML(){
 function catStats(){ const fromClaude=S.projects.filter(p=>p.categorySource==="claude"||p.categoryCorrected); const fixed=fromClaude.filter(p=>p.categoryCorrected); return {n:fromClaude.length, fixed:fixed.length}; }
 function settingsHTML(){
   const st=catStats(), auto=!!(S.settings.claude&&S.settings.claude.autoCategory);
-  return `${drHead("Settings","Categories")}
+  const cs=contacts();
+  return `${drHead("Settings","Settings")}
   <div class="drawer-b">
+    <div><h3 class="sec">Email contacts</h3>
+      <p style="margin:0 0 8px">People a reminder can be emailed to. Put one person per line: <b>First Last (name@company.com)</b>. Everywhere else in the tracker only the name is shown.</p>
+      <label class="f">Contacts <em>(${cs.length} saved)</em><textarea id="f_contacts" rows="8" placeholder="Jane Smith (jane.smith@yourco.com)">${esc(contactsText())}</textarea></label>
+      <p class="err" id="contactsErr" role="alert"></p></div>
+    <div><h3 class="sec">Categories</h3>
     <p style="margin:0">When Claude finds a new project in a transcript, it suggests a category using your definitions and the projects you've already categorised. Every time someone changes its suggestion, that correction is used as an example next time.</p>
     <div class="tiles" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div class="tile"><b class="c-blue">${st.n}</b><span>Categories suggested by Claude</span></div><div class="tile"><b class="c-mag">${st.n?Math.round((st.n-st.fixed)/st.n*100)+"%":"n/d"}</b><span>Kept without a change</span><small>${st.fixed} corrected</small></div></div>
-    <label class="chk"><input type="checkbox" id="f_auto"${auto?" checked":""}> <span><b>File categories automatically.</b> New projects from a transcript are saved under Claude's category without asking, and tagged "Check category" on the dashboard until someone confirms it. When off, you confirm each new project's category before saving.</span></label>
+    <label class="chk"><input type="checkbox" id="f_auto"${auto?" checked":""}> <span><b>File categories automatically.</b> New projects from a transcript are saved under Claude's category without asking, and tagged "Check category" on the dashboard until someone confirms it. When off, you confirm each new project's category before saving.</span></label></div>
   </div>
   <div class="drawer-f"><span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="save-settings">Save</button></div>`;
 }
@@ -1285,9 +1348,16 @@ document.addEventListener("click", async e=>{
     case "signout": signOut(); break;
     case "change-pw": S.drawer={kind:"password"}; renderDrawer(); break;
     case "save-pw": t.disabled=true; await savePassword(); t.disabled=false; break;
-    case "settings": S.drawer={kind:"settings"}; renderDrawer(); break;
+    case "settings": e.preventDefault(); S.drawer={kind:"settings"}; renderDrawer(); break;
     case "save-settings": { const on=!!document.getElementById("f_auto")?.checked;
-      if(await guard(async()=>{ const {error}=await S.sb.from("settings").upsert({id:"claude", doc:{...(S.settings.claude||{}), autoCategory:on}}); if(error) throw error; await loadSettings(); }, "Settings saved")) closeDrawer(); break; }
+      const pc=parseContacts(document.getElementById("f_contacts")?.value||""), er=document.getElementById("contactsErr");
+      if(pc.bad.length){ if(er) er.textContent=`Check ${pc.bad.length===1?"this line":"these lines"} (use First Last (name@company.com)): ${pc.bad.join("; ")}`; return; }
+      t.disabled=true;
+      if(await guard(async()=>{ const a=await S.sb.from("settings").upsert({id:"claude", doc:{...(S.settings.claude||{}), autoCategory:on}}); if(a.error) throw a.error;
+          const b=await S.sb.from("settings").upsert({id:"contacts", doc:{list:pc.list}}); if(b.error) throw b.error; await loadSettings(); render(); }, `Settings saved (${pc.list.length} contact${pc.list.length===1?"":"s"})`)) closeDrawer();
+      else if(t.isConnected) t.disabled=false; break; }
+    case "em-send": t.disabled=true; await scheduleEmail(id, +t.dataset.h); if(t.isConnected) t.disabled=false; break;
+    case "em-cancel": t.disabled=true; await cancelEmail(id); if(t.isConnected) t.disabled=false; break;
     case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "af": case "dtopic": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
     case "open-project": goRecord("project",id); break;
     case "open-project-snap": if(id&&projById(id)){ S.drawer=null; goRecord("project",id); } break;
@@ -1337,7 +1407,7 @@ document.addEventListener("submit", async e=>{ e.preventDefault();
   if(e.target.id==="loginForm"){ doLogin(); return; }
   if(e.target.id==="pwForm"){ savePassword(); return; }
   if(e.target.id==="addDevForm"){ if(await addDevelopment({text:val("nd_text"), topic:val("nd_topic"), notes:val("nd_notes")})){ ["nd_text","nd_notes"].forEach(i=>{ const x=document.getElementById(i); if(x) x.value=""; }); document.getElementById("nd_text")?.focus(); } return; }
-  if(e.target.id==="addRemForm"){ if(await addReminder({person:val("nr_person"), text:val("nr_text"), owner:val("nr_owner")})){ const x=document.getElementById("nr_person"); if(x){ x.value=""; x.focus(); } } return; }
+  if(e.target.id==="addRemForm"){ if(await addReminder({person:val("nr_person"), text:val("nr_text"), owner:""})){ const x=document.getElementById("nr_person"); if(x){ x.value=""; x.focus(); } } return; }
   if(e.target.id==="addTodoForm"){ if(await addTodo({text:val("nt_text"), owner:val("nt_owner"), due:val("nt_due")})){ const x=document.getElementById("nt_text"); if(x){ x.value=""; x.focus(); } } }
 });
 document.addEventListener("input", e=>{

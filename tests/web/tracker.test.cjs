@@ -25,6 +25,7 @@ const seed = [
   ["todos", "r1", { kind: "reminder", person: "B. Sample", text: "Schedule a meeting", owner: "WL", projectId: "p3", due: "", done: false, meetingId: "m" + PREV, meetingDate: PREV, createdAt: now - 11 * DAY }],
   ["todos", "k1", { kind: "development", text: "Casualty rates starting to soften", notes: "Two brokers said renewals came in lower.", topic: "Industry trends", meetingId: "m" + LAST, meetingDate: LAST, createdAt: now - 4 * DAY }],
   ["todos", "k2", { kind: "development", text: "Sample Re results", notes: "", topic: "Company news", meetingId: "m" + PREV, meetingDate: PREV, createdAt: now - 11 * DAY }],
+  ["settings", "contacts", { list: [{ id: "c1", name: "Jane Example", email: "jane@ascot.test" }, { id: "c2", name: "Sam Sample", email: "sam@ascot.test" }] }],
   ["meetings", "m" + LAST, { date: LAST, title: "Weekly meeting", summary: "Covered the sample projects.", source: "transcript", snapshot: [{ id: "p1", name: "Harbor Review", category: "Portfolio Growth Initiatives", status: "Active", update: "- Draft out", description: "Review of the internal operating model" }] }],
   ["meetings", "m" + PREV, { date: PREV, title: "Weekly meeting", source: "import", snapshot: [] }],
 ];
@@ -98,7 +99,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("corp dev and stakeholders columns removed", (await p.$$eval("thead th", x => x.map(e => e.textContent).join("|"))) === "Project|Status|Description|This week's update|Last updated");
   await p.fill("#nr_person", "D. Example"); await p.fill("#nr_text", "Ask about the renewal"); await p.press("#nr_text", "Enter"); await p.waitForTimeout(200);
   const rNew = (await docs(p, "todos")).find(t => t.person === "D. Example");
-  ok("reminder added from the panel", rNew && rNew.kind === "reminder" && rNew.text === "Ask about the renewal" && rNew.owner === "ZT", rNew);
+  ok("reminder added from the panel", rNew && rNew.kind === "reminder" && rNew.text === "Ask about the renewal" && rNew.owner === "", rNew);
   await p.click(`.reminders .todo[data-id="${rNew.id}"] .tx`); await p.waitForSelector("#todoForm");
   ok("reminder opens with the person field", (await p.inputValue("#f_person")) === "D. Example");
   await p.fill("#f_person", "D. Example (Sample Co)"); await p.click('.drawer-f [data-act="save-todo"]'); await p.waitForTimeout(200);
@@ -112,6 +113,32 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("done reminders kept under Show done", (await p.textContent(".remdone summary")).includes("Show done (1 this week"));
   await p.click(".remdone summary"); await p.click(`.remdone .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(400);
   ok("unticking from Show done reopens it", (await doc(p, "todos", rNew.id)).done === false);
+
+  // emailing a reminder
+  await p.click('.reminders .todo[data-id="r1"] .tx'); await p.waitForSelector("#emailBox");
+  ok("email box lists contact names only", (await p.$$eval("#em_to option", o => o.map(x => x.textContent).join("|"))) === "Jane Example|Sam Sample" && !(await p.textContent("#emailBox")).includes("@"));
+  ok("email box says sending isn't switched on yet", (await p.textContent("#emailBox")).includes("isn't switched on yet"));
+  await p.selectOption("#em_to", "c2"); const t0 = Date.now(); await p.click('[data-act="em-send"][data-h="48"]'); await p.waitForTimeout(300);
+  let r1 = await doc(p, "todos", "r1");
+  ok("email scheduled 48 hours out to the chosen contact", r1.emailStatus === "scheduled" && r1.emailTo === "c2" && r1.emailName === "Sam Sample" && Math.abs(r1.sendAt - (t0 + 48 * 3600000)) < 60000, r1);
+  ok("drawer shows when it will go", (await p.textContent("#emailBox")).includes("Will email Sam Sample"));
+  await p.click('[data-act="em-cancel"]'); await p.waitForTimeout(300);
+  ok("email cancelled", (await doc(p, "todos", "r1")).emailStatus === "cancelled" && !!(await p.$("#em_to")));
+  await p.selectOption("#em_to", "c1"); await p.click('[data-act="em-send"][data-h="24"]'); await p.waitForTimeout(300);
+  r1 = await doc(p, "todos", "r1");
+  ok("rescheduled 24 hours out", r1.emailStatus === "scheduled" && r1.emailTo === "c1" && Math.abs(r1.sendAt - (Date.now() + 24 * 3600000)) < 60000, r1);
+  await p.click('.drawer-h [data-act="close"]'); await p.waitForTimeout(150);
+  ok("panel shows the scheduled email", (await p.textContent('.reminders .todo[data-id="r1"] .mailtag')).includes("Jane Example"));
+  // contacts in settings
+  await p.click("#whoDot"); await p.click('#whoMenu [data-act="settings"]'); await p.waitForSelector("#f_contacts");
+  ok("settings shows names with emails", (await p.inputValue("#f_contacts")) === "Jane Example (jane@ascot.test)\nSam Sample (sam@ascot.test)");
+  await p.fill("#f_contacts", "Jane Example (jane@ascot.test)\nnot a contact line");
+  await p.click('[data-act="save-settings"]'); await p.waitForTimeout(200);
+  ok("bad contact line refused", (await p.textContent("#contactsErr")).includes("not a contact line") && (await doc(p, "settings", "contacts")).list.length === 2);
+  await p.fill("#f_contacts", "Jane Example (jane@ascot.test)\nNew Person <new.person@ascot.test>");
+  await p.click('[data-act="save-settings"]'); await p.waitForTimeout(300);
+  const cl = (await doc(p, "settings", "contacts")).list;
+  ok("contacts saved, keeping ids", cl.length === 2 && cl[0].id === "c1" && cl[1].name === "New Person" && cl[1].email === "new.person@ascot.test", cl);
 
   // tick a to-do
   await p.click('.todo[data-id="t1"] input[type=checkbox]'); await p.waitForTimeout(800);

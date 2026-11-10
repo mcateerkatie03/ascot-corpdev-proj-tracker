@@ -8,3 +8,8 @@ verify_jwt = false
 # x-digest-secret header against the DIGEST_SECRET secret itself.
 [functions.digest]
 verify_jwt = false
+
+# Emailed reminders are sent by a Supabase Cron job, not a login. It checks the
+# x-reminder-secret header against the REMINDER_SECRET secret itself.
+[functions.send-reminders]
+verify_jwt = false
