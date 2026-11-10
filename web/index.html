@@ -121,6 +121,7 @@ footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-bl
 .emailbox h3{margin:0;font-size:14px}
 .emailbox .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .emailbox select{width:auto;min-width:200px;max-width:100%}
+.calbtn{background:none;border:0;padding:0;margin:0;font:inherit;color:var(--blue);text-decoration:underline;cursor:pointer}
 .emailbox .st{font-size:13px}
 .emailbox .st.failed{color:var(--magenta)}
 .addrem{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:10px}
@@ -494,9 +495,10 @@ function renderWeek(){
   <p class="source">Source: Corp Dev weekly meetings${lm?`; last meeting ${esc(fmtDate(lm.date))}`:""}. Statuses: Active (ongoing), Pending (no update, or waiting on someone else).</p>`;
 }
 
-/* Emailed reminders: contacts live in the settings row "contacts" ({list:[{id,name,email}]}); only names are shown,
-   except under Settings. A reminder stores emailTo (contact id), emailName, sendAt (ms) and emailStatus
-   ("scheduled" | "sending" | "sent" | "failed" | "cancelled"); supabase/functions/send-reminders sends it. */
+/* Calendar reminders: contacts live in the settings row "contacts" ({list:[{id,name,email}]}); only names are shown,
+   except under Settings. "Remind in 24/48 hours" opens a new Outlook calendar event (Outlook on the web deep link)
+   with the contact invited and the details filled in; the person clicks Send in Outlook. The reminder records
+   calTo (contact id), calName and calAt (event start, ms). A downloadable .ics is offered for desktop Outlook. */
 const EMAIL_RE = /^[^\s@<>()"',;:]+@[^\s@<>()"',;:]+\.[^\s@<>()"',;:]+$/;
 function contacts(){ const l=(S.settings.contacts&&Array.isArray(S.settings.contacts.list))?S.settings.contacts.list:[]; return l.filter(c=>c&&c.id&&c.name&&EMAIL_RE.test(c.email||"")).sort((a,b)=>a.name.localeCompare(b.name)); }
 function contactsText(){ return contacts().map(c=>`${c.name} (${c.email})`).join("\n"); }
@@ -510,45 +512,59 @@ function parseContacts(text){
     const prev=old.find(c=>c.email.toLowerCase()===key); out.push({id:prev?prev.id:"c"+uid(), name, email}); }
   return {list:out, bad};
 }
-const emailReady = () => !!(S.settings.email && S.settings.email.ready);
 function fmtSend(ms){ const d=new Date(ms); return d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+" at "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}); }
-function mailTag(t){
-  if(!t.emailStatus) return "";
-  if(t.emailStatus==="scheduled"||t.emailStatus==="sending") return `<span class="mailtag" title="Email scheduled">&#9993; ${esc(t.emailName||"")} &middot; ${esc(fmtSend(t.sendAt))}</span>`;
-  if(t.emailStatus==="sent") return `<span class="mailtag sent">&#9993; Emailed ${esc(t.emailName||"")}</span>`;
-  if(t.emailStatus==="failed") return `<span class="mailtag failed" title="${esc(t.emailError||"")}">&#9993; Email not sent</span>`;
-  return "";
+/* Start time: 24 or 48 hours from now, rounded up to the next quarter hour. */
+function calStart(hours){ const d=new Date(Date.now()+hours*3600000); d.setSeconds(0,0); d.setMinutes(Math.ceil(d.getMinutes()/15)*15); return d; }
+function calDetails(t){
+  const p=t.projectId&&projById(t.projectId);
+  const link=location.href.split("#")[0]+"#todo/"+encodeURIComponent(t.id);
+  const subject = t.person ? `Reminder: follow up with ${t.person}` : `Reminder: ${t.text||"follow-up"}`;
+  const lines=[t.person?`Follow up with: ${t.person}`:"", t.text?`About: ${t.text}`:"", p?`Project: ${p.name}`:"", t.due?`By: ${fmtDate(t.due)}`:"", t.notes?`Notes: ${t.notes}`:""].filter(Boolean);
+  return {subject, body:`A reminder from the Corp Dev tracker.\n\n${lines.join("\n")}\n\nOnce you've followed up, tick it off in the tracker: ${link}`};
 }
-function emailBoxHTML(id){
+function outlookLink(t, c, start){
+  const d=calDetails(t), end=new Date(start.getTime()+15*60000);
+  const q=new URLSearchParams({path:"/calendar/action/compose", rru:"addevent", subject:d.subject, body:d.body, startdt:start.toISOString(), enddt:end.toISOString(), to:c.email});
+  return "https://outlook.office.com/calendar/0/deeplink/compose?"+q.toString();
+}
+function icsFile(t, c, start){
+  const d=calDetails(t), end=new Date(start.getTime()+15*60000);
+  const st=x=>x.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
+  const e=v=>String(v||"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
+  const fold=l=>{ const out=[]; let r=l; while(r.length>73){ out.push(r.slice(0,73)); r=" "+r.slice(73); } out.push(r); return out.join("\r\n"); };
+  const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Ascot Group//Corp Dev tracker//EN","METHOD:PUBLISH","BEGIN:VEVENT","UID:"+t.id+"-"+start.getTime()+"@corpdev-tracker",
+    "DTSTAMP:"+st(new Date()),"DTSTART:"+st(start),"DTEND:"+st(end),"SUMMARY:"+e(d.subject),"DESCRIPTION:"+e(d.body),
+    "ATTENDEE;CN="+e(c.name)+";ROLE=REQ-PARTICIPANT;RSVP=FALSE:mailto:"+c.email,"BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+e(d.subject),"TRIGGER:-PT15M","END:VALARM","END:VEVENT","END:VCALENDAR"];
+  return L.map(fold).join("\r\n")+"\r\n";
+}
+function calTag(t){ return t.calName&&t.calAt ? `<span class="mailtag" title="Calendar reminder">&#128197; ${esc(t.calName)} &middot; ${esc(fmtSend(t.calAt))}</span>` : ""; }
+function calendarBoxHTML(id){
   const t=allRows().find(x=>x.id===id); if(!t) return "";
-  const cs=contacts(), st=t.emailStatus;
-  let status="";
-  if(st==="scheduled"||st==="sending") status=`<div class="st">&#9993; Will email <b>${esc(t.emailName||"")}</b> on <b>${esc(fmtSend(t.sendAt))}</b>.${t.done?" It won't go, because this reminder is ticked off.":""}</div>
-    <div class="row"><button type="button" class="btn sm" data-act="em-cancel" data-id="${esc(id)}">Cancel the email</button></div>`;
-  else if(st==="sent") status=`<div class="st">&#9993; Emailed <b>${esc(t.emailName||"")}</b> on ${esc(fmtSend(t.emailSentAt||t.sendAt))}.</div>`;
-  else if(st==="failed") status=`<div class="st failed">&#9993; The email to <b>${esc(t.emailName||"")}</b> wasn't sent: ${esc(t.emailError||"unknown error")}.</div>`;
-  else if(st==="cancelled") status=`<div class="st t2">The email to ${esc(t.emailName||"")} was cancelled${t.emailError?`: ${esc(t.emailError)}`:""}.</div>`;
-  const pick = cs.length ? `<div class="row"><select id="em_to" aria-label="Email this reminder to">${cs.map(c=>`<option value="${esc(c.id)}"${c.id===t.emailTo?" selected":""}>${esc(c.name)}</option>`).join("")}</select>
-      <button type="button" class="btn sm primary" data-act="em-send" data-h="24" data-id="${esc(id)}">Email in 24 hours</button><button type="button" class="btn sm" data-act="em-send" data-h="48" data-id="${esc(id)}">Email in 48 hours</button></div>`
-    : `<div class="st t2">No one to email yet. Add names under <a href="#" data-act="settings">Settings</a> (the menu under your initials).</div>`;
-  const scheduled = st==="scheduled"||st==="sending";
-  return `<div class="emailbox"><h3>Email this reminder</h3>${status}${scheduled?"":pick}
-    ${emailReady()?"":`<div class="t2">Email sending isn't switched on yet. Scheduled emails go out once it is, as long as that's within 3 days.</div>`}</div>`;
+  const cs=contacts();
+  const status = t.calName&&t.calAt ? `<div class="st">&#128197; Calendar reminder for <b>${esc(t.calName)}</b>, ${esc(fmtSend(t.calAt))}. If you didn't click Send in Outlook, it wasn't sent; use the buttons again.</div>` : "";
+  const pick = cs.length ? `<div class="row"><select id="cal_to" aria-label="Who to remind">${cs.map(c=>`<option value="${esc(c.id)}"${c.id===t.calTo?" selected":""}>${esc(c.name)}</option>`).join("")}</select>
+      <button type="button" class="btn sm primary" data-act="cal-open" data-h="24" data-id="${esc(id)}">Remind in 24 hours</button><button type="button" class="btn sm" data-act="cal-open" data-h="48" data-id="${esc(id)}">Remind in 48 hours</button></div>
+    <div class="t2">Opens a new Outlook calendar event with them invited and the details filled in. Check it, then click <b>Send</b>. Using desktop Outlook instead? Download it <button type="button" class="calbtn" data-act="cal-ics" data-h="24" data-id="${esc(id)}">for 24 hours</button> or <button type="button" class="calbtn" data-act="cal-ics" data-h="48" data-id="${esc(id)}">for 48 hours</button> and open the file.</div>`
+    : `<div class="st t2">No one to choose yet. Add names under <a href="#" data-act="settings">Settings</a> (the menu under your initials).</div>`;
+  return `<div class="emailbox"><h3>Send a calendar reminder</h3>${status}${pick}</div>`;
 }
-async function scheduleEmail(id, hours){
-  const c=contacts().find(x=>x.id===val("em_to")); if(!c){ toast("Choose who to email."); return; }
-  const sendAt=Date.now()+hours*3600000;
-  if(await guard(()=>S.db.collection("todos").doc(id).update({emailTo:c.id, emailName:c.name, sendAt, emailStatus:"scheduled", emailError:"", emailScheduledAt:Date.now(), ...meta()}), `Email to ${c.name} scheduled for ${fmtSend(sendAt)}`)) refreshEmailBox(id);
+async function openCalendar(id, hours, how){
+  const t=allRows().find(x=>x.id===id), c=contacts().find(x=>x.id===val("cal_to")); if(!t) return; if(!c){ toast("Choose who to remind."); return; }
+  const start=calStart(hours);
+  if(how==="ics"){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([icsFile(t,c,start)],{type:"text/calendar;charset=utf-8"}));
+    a.download=("Reminder "+(t.person||"follow-up")).replace(/[^\w.-]+/g,"-").slice(0,60)+".ics"; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000); }
+  else window.open(outlookLink(t,c,start), "_blank", "noopener");
+  if(await guard(()=>S.db.collection("todos").doc(id).update({calTo:c.id, calName:c.name, calAt:start.getTime(), calSetAt:Date.now(), ...meta()}),
+      how==="ics" ? "Calendar file downloaded. Open it in Outlook, then send it." : `Outlook opened for ${c.name}. Check the invite and click Send.`)) refreshCalBox(id);
 }
-async function cancelEmail(id){ if(await guard(()=>S.db.collection("todos").doc(id).update({emailStatus:"cancelled", emailError:"", ...meta()}), "Email cancelled")) refreshEmailBox(id); }
-function refreshEmailBox(id){ const el=document.getElementById("emailBox"); if(el) el.innerHTML=emailBoxHTML(id); }
+function refreshCalBox(id){ const el=document.getElementById("calBox"); if(el) el.innerHTML=calendarBoxHTML(id); }
 
 /* Reminders: people to follow up with, picked out of the transcripts (to-dos with kind "reminder") */
 function remListHTML(list){
   if(!list.length) return `<p class="t2" style="margin:6px 0 0">Nothing to follow up on.</p>`;
   const lm=latestMeeting();
   return `<ul class="todos">${list.map(t=>{ const p=t.projectId&&projById(t.projectId), od=todoOverdue(t), carried=!t.done&&lm&&t.meetingDate&&t.meetingDate<lm.date;
-    const meta=[t.owner?`<span class="owner">${esc(t.owner)}</span>`:"", p?esc(p.name):"", carried?`<span class="carry">From ${esc(fmtDate(t.meetingDate))}</span>`:"", t.done?"":mailTag(t)].filter(Boolean).join(" ");
+    const meta=[t.owner?`<span class="owner">${esc(t.owner)}</span>`:"", p?esc(p.name):"", carried?`<span class="carry">From ${esc(fmtDate(t.meetingDate))}</span>`:"", t.done?"":calTag(t)].filter(Boolean).join(" ");
     return `<li class="todo rem${t.done?" done":""}" data-id="${esc(t.id)}"><input type="checkbox" data-act="todo-done" data-id="${esc(t.id)}" ${t.done?"checked":""} aria-label="Done: follow up with ${esc(t.person||"")}">
       <div class="tx" data-act="open-todo" data-id="${esc(t.id)}" tabindex="0"><b>${t.person?`<span class="rwho">${esc(t.person)}</span>${t.text?": ":""}`:""}${esc(t.text||"")}</b>${meta?`<div class="meta">${meta}</div>`:""}</div>
       ${t.due?`<div class="due${od?" over":""}">${od?"Overdue: ":""}${esc(fmtDate(t.due))}</div>`:""}</li>`; }).join("")}</ul>`;
@@ -831,7 +847,7 @@ function todoFormHTML(dr){
       <label class="chk full"><input type="checkbox" id="f_done"${t.done?" checked":""}> Done</label>
       <label class="f full">Notes<textarea id="f_notes" rows="3">${esc(t.notes||"")}</textarea></label>
     </div>
-    ${rem&&!isNew?`<div id="emailBox">${emailBoxHTML(dr.id)}</div>`:""}
+    ${rem&&!isNew?`<div id="calBox">${calendarBoxHTML(dr.id)}</div>`:""}
     ${t.quote?`<p class="source">From the transcript: "${esc(t.quote)}"</p>`:""}
     ${t.meetingDate?`<p class="t2" style="margin:0">Added from the meeting on ${esc(fmtDate(t.meetingDate))}.</p>`:""}
     ${isNew?"":`<div><h3 class="sec">History</h3><ul class="mlist hist" id="histList"></ul></div>`}
@@ -871,8 +887,8 @@ function settingsHTML(){
   const cs=contacts();
   return `${drHead("Settings","Settings")}
   <div class="drawer-b">
-    <div><h3 class="sec">Email contacts</h3>
-      <p style="margin:0 0 8px">People a reminder can be emailed to. Put one person per line: <b>First Last (name@company.com)</b>. Everywhere else in the tracker only the name is shown.</p>
+    <div><h3 class="sec">Contacts</h3>
+      <p style="margin:0 0 8px">People you can send a reminder to. Put one person per line: <b>First Last (name@company.com)</b>. Everywhere else in the tracker only the name is shown.</p>
       <label class="f">Contacts <em>(${cs.length} saved)</em><textarea id="f_contacts" rows="8" placeholder="Jane Smith (jane.smith@yourco.com)">${esc(contactsText())}</textarea></label>
       <p class="err" id="contactsErr" role="alert"></p></div>
     <div><h3 class="sec">Categories</h3>
@@ -1356,8 +1372,8 @@ document.addEventListener("click", async e=>{
       if(await guard(async()=>{ const a=await S.sb.from("settings").upsert({id:"claude", doc:{...(S.settings.claude||{}), autoCategory:on}}); if(a.error) throw a.error;
           const b=await S.sb.from("settings").upsert({id:"contacts", doc:{list:pc.list}}); if(b.error) throw b.error; await loadSettings(); render(); }, `Settings saved (${pc.list.length} contact${pc.list.length===1?"":"s"})`)) closeDrawer();
       else if(t.isConnected) t.disabled=false; break; }
-    case "em-send": t.disabled=true; await scheduleEmail(id, +t.dataset.h); if(t.isConnected) t.disabled=false; break;
-    case "em-cancel": t.disabled=true; await cancelEmail(id); if(t.isConnected) t.disabled=false; break;
+    case "cal-open": await openCalendar(id, +t.dataset.h, "outlook"); break;
+    case "cal-ics": await openCalendar(id, +t.dataset.h, "ics"); break;
     case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "af": case "dtopic": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
     case "open-project": goRecord("project",id); break;
     case "open-project-snap": if(id&&projById(id)){ S.drawer=null; goRecord("project",id); } break;

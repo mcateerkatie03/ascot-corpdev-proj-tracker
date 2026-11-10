@@ -114,21 +114,24 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   await p.click(".remdone summary"); await p.click(`.remdone .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(400);
   ok("unticking from Show done reopens it", (await doc(p, "todos", rNew.id)).done === false);
 
-  // emailing a reminder
-  await p.click('.reminders .todo[data-id="r1"] .tx'); await p.waitForSelector("#emailBox");
-  ok("email box lists contact names only", (await p.$$eval("#em_to option", o => o.map(x => x.textContent).join("|"))) === "Jane Example|Sam Sample" && !(await p.textContent("#emailBox")).includes("@"));
-  ok("email box says sending isn't switched on yet", (await p.textContent("#emailBox")).includes("isn't switched on yet"));
-  await p.selectOption("#em_to", "c2"); const t0 = Date.now(); await p.click('[data-act="em-send"][data-h="48"]'); await p.waitForTimeout(300);
+  // calendar reminder for a contact
+  await p.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; }; });
+  await p.click('.reminders .todo[data-id="r1"] .tx'); await p.waitForSelector("#calBox");
+  ok("calendar box lists contact names only", (await p.$$eval("#cal_to option", o => o.map(x => x.textContent).join("|"))) === "Jane Example|Sam Sample" && !(await p.textContent("#calBox")).includes("@"));
+  await p.selectOption("#cal_to", "c2"); const t0 = Date.now(); await p.click('[data-act="cal-open"][data-h="48"]'); await p.waitForTimeout(300);
+  const opened = await p.evaluate(() => window.__opened);
+  const u = new URL(opened[0]); const sd = Date.parse(u.searchParams.get("startdt"));
+  ok("opens an Outlook event with the contact invited", opened.length === 1 && u.host === "outlook.office.com" && u.searchParams.get("to") === "sam@ascot.test" && u.searchParams.get("rru") === "addevent", opened);
+  ok("event 48 hours out, quarter-hour, 15 minutes long", sd - t0 >= 48 * 3600000 - 60000 && sd - t0 <= 48 * 3600000 + 16 * 60000 && new Date(sd).getMinutes() % 15 === 0 && Date.parse(u.searchParams.get("enddt")) - sd === 15 * 60000);
+  ok("event has the reminder details", u.searchParams.get("subject") === "Reminder: follow up with B. Sample" && u.searchParams.get("body").includes("About: Schedule a meeting") && u.searchParams.get("body").includes("Project: Project Lantern"));
   let r1 = await doc(p, "todos", "r1");
-  ok("email scheduled 48 hours out to the chosen contact", r1.emailStatus === "scheduled" && r1.emailTo === "c2" && r1.emailName === "Sam Sample" && Math.abs(r1.sendAt - (t0 + 48 * 3600000)) < 60000, r1);
-  ok("drawer shows when it will go", (await p.textContent("#emailBox")).includes("Will email Sam Sample"));
-  await p.click('[data-act="em-cancel"]'); await p.waitForTimeout(300);
-  ok("email cancelled", (await doc(p, "todos", "r1")).emailStatus === "cancelled" && !!(await p.$("#em_to")));
-  await p.selectOption("#em_to", "c1"); await p.click('[data-act="em-send"][data-h="24"]'); await p.waitForTimeout(300);
-  r1 = await doc(p, "todos", "r1");
-  ok("rescheduled 24 hours out", r1.emailStatus === "scheduled" && r1.emailTo === "c1" && Math.abs(r1.sendAt - (Date.now() + 24 * 3600000)) < 60000, r1);
+  ok("reminder records who and when", r1.calTo === "c2" && r1.calName === "Sam Sample" && r1.calAt === sd, r1);
+  ok("drawer shows it", (await p.textContent("#calBox")).includes("Calendar reminder for Sam Sample"));
+  const [ics] = await Promise.all([p.waitForEvent("download"), p.click('[data-act="cal-ics"][data-h="24"]')]);
+  const icsText = fs.readFileSync(await ics.path(), "utf8").replace(/\r\n /g, "");   // unfold long lines
+  ok("desktop Outlook file has the invitee and alarm", /ATTENDEE;CN=Sam Sample;.*mailto:sam@ascot.test/.test(icsText) && icsText.includes("SUMMARY:Reminder: follow up with B. Sample") && icsText.includes("TRIGGER:-PT15M"), icsText.slice(0, 400));
   await p.click('.drawer-h [data-act="close"]'); await p.waitForTimeout(150);
-  ok("panel shows the scheduled email", (await p.textContent('.reminders .todo[data-id="r1"] .mailtag')).includes("Jane Example"));
+  ok("panel shows the calendar reminder", (await p.textContent('.reminders .todo[data-id="r1"] .mailtag')).includes("Sam Sample"));
   // contacts in settings
   await p.click("#whoDot"); await p.click('#whoMenu [data-act="settings"]'); await p.waitForSelector("#f_contacts");
   ok("settings shows names with emails", (await p.inputValue("#f_contacts")) === "Jane Example (jane@ascot.test)\nSam Sample (sam@ascot.test)");
