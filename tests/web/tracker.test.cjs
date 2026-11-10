@@ -123,7 +123,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   const u = new URL(opened[0]); const sd = Date.parse(u.searchParams.get("startdt"));
   ok("opens an Outlook event with the contact invited", opened.length === 1 && u.host === "outlook.office.com" && u.searchParams.get("to") === "sam@ascot.test" && u.searchParams.get("rru") === "addevent", opened);
   ok("event 48 hours out, quarter-hour, 15 minutes long", sd - t0 >= 48 * 3600000 - 60000 && sd - t0 <= 48 * 3600000 + 16 * 60000 && new Date(sd).getMinutes() % 15 === 0 && Date.parse(u.searchParams.get("enddt")) - sd === 15 * 60000);
-  ok("event has the reminder details", u.searchParams.get("subject") === "Reminder: follow up with B. Sample" && u.searchParams.get("body").includes("About: Schedule a meeting") && u.searchParams.get("body").includes("Project: Project Lantern"));
+  ok("event has the reminder details", u.searchParams.get("subject") === "Reminder: follow up with B. Sample" && u.searchParams.get("body").includes("Project Name: Project Lantern\nFollow-up task: Follow up with B. Sample: Schedule a meeting"), u.searchParams.get("body"));
   let r1 = await doc(p, "todos", "r1");
   ok("reminder records who and when", r1.calTo === "c2" && r1.calName === "Sam Sample" && r1.calAt === sd, r1);
   ok("drawer shows it", (await p.textContent("#calBox")).includes("Calendar reminder for Sam Sample"));

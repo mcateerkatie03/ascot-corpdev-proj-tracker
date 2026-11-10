@@ -519,7 +519,8 @@ function calDetails(t){
   const p=t.projectId&&projById(t.projectId);
   const link=location.href.split("#")[0]+"#todo/"+encodeURIComponent(t.id);
   const subject = t.person ? `Reminder: follow up with ${t.person}` : `Reminder: ${t.text||"follow-up"}`;
-  const lines=[t.person?`Follow up with: ${t.person}`:"", t.text?`About: ${t.text}`:"", p?`Project: ${p.name}`:"", t.due?`By: ${fmtDate(t.due)}`:"", t.notes?`Notes: ${t.notes}`:""].filter(Boolean);
+  const task = t.person ? `Follow up with ${t.person}${t.text?`: ${t.text}`:""}` : (t.text||"Follow up");
+  const lines=[`Project Name: ${p?p.name:"None"}`, `Follow-up task: ${task}`, t.due?`By: ${fmtDate(t.due)}`:"", t.notes?`Notes: ${t.notes}`:""].filter(Boolean);
   return {subject, body:`A reminder from the Corp Dev tracker.\n\n${lines.join("\n")}\n\nOnce you've followed up, tick it off in the tracker: ${link}`};
 }
 function outlookLink(t, c, start){
