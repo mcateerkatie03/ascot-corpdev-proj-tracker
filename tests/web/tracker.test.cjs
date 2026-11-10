@@ -94,7 +94,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("week to-dos: overdue first, later one left out", wk.join(",") === "t2,t1", wk);
   ok("carried-forward label", (await p.textContent('.todo[data-id="t2"]')).includes("Carried from"));
   ok("overdue marked", !!(await p.$('.todo[data-id="t2"] .due.over')));
-  ok("tab badge counts my to-dos", (await p.textContent("#tagTodos")) === "2 yours");
+  ok("no owner badge on the To-dos tab", (await p.textContent("#tagTodos")) === "");
 
   // reminders panel beside the table
   ok("reminders panel beside the table", (await p.$$(".weekgrid > aside.reminders")).length === 1);
@@ -166,7 +166,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   await p.click('tr[data-id="p4"]'); await p.waitForSelector("#projectForm");
   ok("project to-dos listed in drawer", (await p.$$("#projectForm .todo")).length === 1);
   await p.fill("#pt_text", "Print handouts"); await p.click('[data-act="add-ptodo"]'); await p.waitForTimeout(200);
-  ok("to-do added from project drawer", (await docs(p, "todos")).some(t => t.text === "Print handouts" && t.projectId === "p4" && t.owner === "ZT"));
+  ok("to-do added from project drawer", (await docs(p, "todos")).some(t => t.text === "Print handouts" && t.projectId === "p4" && t.owner === ""));
   await p.selectOption("#f_status", "Completed"); await p.click('.drawer-f [data-act="save-project"]'); await p.waitForTimeout(200);
   const p4 = await doc(p, "projects", "p4");
   ok("completed project gets a closed date", p4.status === "Completed" && !!p4.closedAt, p4);
@@ -302,10 +302,9 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   // ---- To-dos page and phone layout
   p = await page(b, { hash: "#todos" });
   ok("todos default open, reminders not listed", (await p.$$eval(".todo", x => x.length)) === 3);
-  await p.click('.fchip[data-act="tf"][data-v="mine"]');
-  ok("mine filter", (await p.$$eval(".todo", x => x.map(e => e.dataset.id).join(","))) === "t1,t3");
+  ok("no Mine filter, owner filters or owner box", !(await p.$('.fchip[data-act="tf"][data-v="mine"]')) && !(await p.$('.fchip[data-act="tpl"]')) && !(await p.$("#nt_owner")));
   await p.fill("#nt_text", "New sample task"); await p.press("#nt_text", "Enter"); await p.waitForTimeout(200);
-  ok("add to-do from the to-dos page", (await docs(p, "todos")).some(t => t.text === "New sample task" && t.owner === "ZT"));
+  ok("add to-do from the to-dos page", (await docs(p, "todos")).some(t => t.text === "New sample task" && t.owner === ""));
   await p.click('.fchip[data-act="tf"][data-v="open"]'); await p.click('.todo[data-id="t2"] .tx'); await p.waitForSelector("#todoForm");
   await p.fill("#f_owner", "zt"); await p.click('.drawer-f [data-act="save-todo"]'); await p.waitForTimeout(200);
   ok("owner saved upper-case", (await doc(p, "todos", "t2")).owner === "ZT");

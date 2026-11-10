@@ -233,7 +233,7 @@ textarea{resize:vertical;min-height:64px}
 .btn.sm{padding:4px 9px;font-size:12px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.addtodo{display:grid;grid-template-columns:minmax(0,1fr) 90px 150px auto;gap:6px;align-items:start}
+.addtodo{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:6px;align-items:start}
 @media (max-width:700px){.addtodo{grid-template-columns:1fr 1fr}.addtodo input:first-child{grid-column:1/-1}}
 
 /* Drawer */
@@ -478,7 +478,7 @@ function render(){
   if(!S.session){ setMenu(false); const keep=[val("li_user")]; v.innerHTML=loginHTML(); const u=document.getElementById("li_user"); if(u&&keep[0]) u.value=keep[0]; renderDrawer(); return; }
   document.querySelectorAll("nav.tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.view===S.view ? "page" : "false"));
   const mine=S.todos.filter(t=>!t.done && myInitials() && initialsList(t.owner).includes(myInitials())).length;
-  document.getElementById("tagTodos").textContent = mine ? `${mine} yours` : "";
+  document.getElementById("tagTodos").textContent = "";
   const html = TABLES.some(t=>!S.loaded[t]) ? "" : S.view==="projects" ? renderProjects() : S.view==="todos" ? renderTodos() : S.view==="archive" ? renderArchive() : S.view==="developments" ? renderDevelopments() : S.view==="calendar" ? renderCalendar() : S.view==="meetings" ? renderMeetings() : renderWeek();
   const ae=document.activeElement, aid=ae&&ae.id, pos=ae&&ae.selectionStart;
   v.innerHTML = statusBanner() + html;
@@ -679,15 +679,14 @@ function renderTodos(){
   const F={open:t=>!t.done, mine:t=>!t.done&&!!me&&initialsList(t.owner).includes(me), overdue:todoOverdue, week:t=>!t.done&&(!t.due||t.due<=addDays(TODAY(),7)), done:t=>t.done, all:()=>true};
   const byPerson=t=>S.tpl==="all"||initialsList(t.owner).includes(S.tpl)||String(t.owner||"").toUpperCase()===S.tpl;
   const q=(S.tq||"").trim().toLowerCase(); const base=S.todos.filter(t=>!q||[t.text,t.owner,t.notes,(projById(t.projectId)||{}).name].join(" ").toLowerCase().includes(q));
-  const rows=sortTodos(base.filter(F[S.tf]||F.open).filter(byPerson));
+  const rows=sortTodos(base.filter(F[S.tf]||F.open));
   const chip=(grp,v,label,n,cls)=>`<button type="button" class="fchip${cls||""}" data-act="${grp}" data-v="${esc(v)}" aria-pressed="${S[grp]===v}">${esc(label)}<b>${n}</b></button>`;
   return `
   <section class="pagehead"><div><h2 class="action-title">To-dos</h2><p class="sub">Action items from the weekly meetings. Unfinished ones carry forward to the next week until they're ticked off.</p></div></section>
   <section class="toolbar"><div class="grow"><input type="search" id="tq" placeholder="Search to-dos" aria-label="Search to-dos" value="${esc(S.tq||"")}"></div><button class="btn" data-act="export-xlsx">Export Excel</button></section>
-  <form class="addtodo" id="addTodoForm" aria-label="Add a to-do"><input type="text" id="nt_text" placeholder="Add a to-do" aria-label="To-do"><input type="text" id="nt_owner" placeholder="Owner" aria-label="Owner initials" list="ownerList" value="${esc(me)}"><input type="date" id="nt_due" aria-label="Due date"><button class="btn primary">Add</button>
-    <datalist id="ownerList">${people.map(i=>`<option value="${esc(i)}">`).join("")}</datalist></form>
-  <div class="frow"><div class="fchips" role="group" aria-label="Filter to-dos">${[["open","Open"],["week","Due this week"],["mine","Mine"],["overdue","Overdue"],["done","Done"],["all","All"]].filter(([v])=>v!=="mine"||me).map(([v,l])=>chip("tf",v,l,base.filter(F[v]).length,v==="overdue"?" late":"")).join("")}</div>
-    ${people.length?`<div class="fchips" role="group" aria-label="Owner">${chip("tpl","all","Everyone",base.filter(F[S.tf]||F.open).length)}${people.map(i=>chip("tpl",i,i,base.filter(F[S.tf]||F.open).filter(t=>initialsList(t.owner).includes(i)).length)).join("")}</div>`:""}</div>
+  <form class="addtodo" id="addTodoForm" aria-label="Add a to-do"><input type="text" id="nt_text" placeholder="Add a to-do" aria-label="To-do"><input type="date" id="nt_due" aria-label="Due date"><button class="btn primary">Add</button></form>
+  <div class="frow"><div class="fchips" role="group" aria-label="Filter to-dos">${[["open","Open"],["week","Due this week"],["overdue","Overdue"],["done","Done"],["all","All"]].map(([v,l])=>chip("tf",v,l,base.filter(F[v]).length,v==="overdue"?" late":"")).join("")}</div>
+  </div>
   <section>${todoListHTML(rows,{showProject:true,showMeeting:true})}</section>
   <p class="source">${rows.length} to-do${rows.length===1?"":"s"} shown.</p>`;
 }
@@ -923,7 +922,7 @@ function projectFormHTML(dr){
       <p class="source" style="margin-top:6px">Paste the SharePoint "Copy link" URL. Viewers need SharePoint access to open it.</p></div>
     ${isNew||!S.reminders.some(r=>r.projectId===p.id)?"":`<div><h3 class="sec">Reminders</h3>${remListHTML(sortTodos(S.reminders.filter(r=>r.projectId===p.id)))}</div>`}
     ${isNew?"":`<div><h3 class="sec">To-dos</h3>${todoListHTML(todos,{showMeeting:true})}
-      <div class="addtodo" style="margin-top:8px"><input type="text" id="pt_text" placeholder="Add a to-do for this project" aria-label="New to-do"><input type="text" id="pt_owner" placeholder="Owner" aria-label="Owner" value="${esc(myInitials())}"><input type="date" id="pt_due" aria-label="Due date"><button type="button" class="btn sm primary" data-act="add-ptodo">Add</button></div></div>
+      <div class="addtodo" style="margin-top:8px"><input type="text" id="pt_text" placeholder="Add a to-do for this project" aria-label="New to-do"><input type="date" id="pt_due" aria-label="Due date"><button type="button" class="btn sm primary" data-act="add-ptodo">Add</button></div></div>
     <div><h3 class="sec">History</h3><ul class="mlist hist" id="histList"></ul></div>`}
   </form>
   <div class="drawer-f">
@@ -1506,7 +1505,7 @@ document.addEventListener("click", async e=>{
     case "todo-done": await toggleTodo(id, t.checked); break;
     case "toast-undo": { const fn=toast.undo; document.getElementById("toastRoot").innerHTML=""; toast.undo=null; if(fn) await fn(); break; }
     case "rem-showdone": S.remShowDone=!S.remShowDone; break;
-    case "add-ptodo": { const dr=S.drawer; if(!dr) return; t.disabled=true; if(await addTodo({text:val("pt_text"), owner:val("pt_owner"), due:val("pt_due"), projectId:dr.id})){ captureForm(); dr.rendered=false; renderDrawer(); restoreForm(); } t.disabled=false; break; }
+    case "add-ptodo": { const dr=S.drawer; if(!dr) return; t.disabled=true; if(await addTodo({text:val("pt_text"), owner:"", due:val("pt_due"), projectId:dr.id})){ captureForm(); dr.rendered=false; renderDrawer(); restoreForm(); } t.disabled=false; break; }
     case "cat-ok": { const dr=S.drawer; if(await guard(()=>S.db.collection("projects").doc(dr.id).update({categoryCheck:false, ...meta()}),"Category confirmed")){ dr.orig.categoryCheck=false; rerenderDrawer(); } break; }
     case "add-link": readLinks(); S.drawer.links.push({label:"",url:""}); document.getElementById("linkRows").innerHTML=linkRowsHTML(S.drawer.links); break;
     case "rm-link": readLinks(); S.drawer.links.splice(+t.dataset.i,1); document.getElementById("linkRows").innerHTML=linkRowsHTML(S.drawer.links); break;
@@ -1546,7 +1545,7 @@ document.addEventListener("submit", async e=>{ e.preventDefault();
   if(e.target.id==="addEvForm"){ if(await addEvent({text:val("ne_text"), type:val("ne_type"), date:val("ne_date"), endDate:val("ne_end")})){ ["ne_text","ne_date","ne_end"].forEach(i=>{ const x=document.getElementById(i); if(x) x.value=""; }); } return; }
   if(e.target.id==="addDevForm"){ if(await addDevelopment({text:val("nd_text"), topic:val("nd_topic"), notes:val("nd_notes")})){ ["nd_text","nd_notes"].forEach(i=>{ const x=document.getElementById(i); if(x) x.value=""; }); document.getElementById("nd_text")?.focus(); } return; }
   if(e.target.id==="addRemForm"){ if(await addReminder({person:val("nr_person"), text:val("nr_text"), owner:""})){ const x=document.getElementById("nr_person"); if(x){ x.value=""; x.focus(); } } return; }
-  if(e.target.id==="addTodoForm"){ if(await addTodo({text:val("nt_text"), owner:val("nt_owner"), due:val("nt_due")})){ const x=document.getElementById("nt_text"); if(x){ x.value=""; x.focus(); } } }
+  if(e.target.id==="addTodoForm"){ if(await addTodo({text:val("nt_text"), owner:"", due:val("nt_due")})){ const x=document.getElementById("nt_text"); if(x){ x.value=""; x.focus(); } } }
 });
 document.addEventListener("input", e=>{
   const id=e.target.id;
