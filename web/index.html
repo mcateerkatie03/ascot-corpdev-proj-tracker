@@ -193,8 +193,8 @@ tr.cathead td{background:var(--tile)!important;border-top:2px solid var(--ink);f
 
 /* Pills */
 .pill{display:inline-block;padding:2px 8px;font-size:11px;font-weight:bold;border:1px solid currentColor;white-space:nowrap}
-.s-Active{color:var(--blue)}
-.s-Pending{color:var(--purple);border-style:dashed}
+.s-Active{color:var(--magenta)}
+.s-Pending{color:var(--ink);border-style:dashed}
 .s-Completed{color:#fff;background:var(--teal);border-color:var(--teal)}
 .s-Dropped{color:var(--muted);text-decoration:line-through}
 .stage{display:inline-block;margin-top:4px;font-size:11px;color:var(--muted)}
@@ -509,9 +509,9 @@ function renderWeek(){
     <p class="sub">${lm?`From the meeting on ${esc(fmtDate(lm.date))}${lm.summary?`: ${esc(lm.summary)}`:"."}`:"Import a meeting transcript to fill in this week's updates and to-dos."}</p></div>
     <div class="headacts"><button class="btn accent" data-act="import-tr">Import transcript</button><button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn" data-act="print">Print</button></div></section>
   <section class="tiles" aria-label="Headline numbers">
-    <div class="tile"><b class="c-blue">${act.length}</b><span>Active projects</span><small>${open.length} on the list</small></div>
-    <div class="tile"><b class="c-purple">${pend.length}</b><span>Pending</span><small>No update, or waiting on others</small></div>
-    <div class="tile"><b class="c-mag">${openTodos.length}</b><span>Open to-dos</span><small>${overdue.length} overdue</small></div>
+    <div class="tile"><b class="c-mag">${act.length}</b><span>Active projects</span><small>${open.length} on the list</small></div>
+    <div class="tile"><b class="c-navy">${pend.length}</b><span>Pending</span><small>No update, or waiting on others</small></div>
+    <div class="tile"><b class="c-blue">${openTodos.length}</b><span>Open to-dos</span><small>${overdue.length} overdue</small></div>
     <div class="tile"><b class="c-teal">${updated}</b><span>Updated at the last meeting</span><small>${closedLast.length?`${closedLast.length} completed or dropped`:lm?"None closed":"No meeting yet"}</small></div>
   </section>
   <section class="cols">
