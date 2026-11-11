@@ -126,6 +126,7 @@ footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-bl
 @media (max-width:700px){.adddev{grid-template-columns:1fr}}
 /* Dashboard: project table with the reminders panel beside it */
 .weekgrid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+.wkside{display:flex;flex-direction:column;gap:22px;min-width:0}
 .weekgrid>*{min-width:0}
 .reminders{position:sticky;top:12px;background:var(--alt);border-top:3px solid var(--purple);padding:12px 14px 14px}
 .reminders h3{margin:0 0 2px;font-size:15px;color:var(--purple)}
@@ -517,9 +518,10 @@ function renderWeek(){
   <section class="cols">
     <div><h3 class="sec">To-dos for the week <span class="n">${due.length}</span></h3>${todoListHTML(due, {showProject:true})}
       ${later?`<p class="t2" style="margin-top:6px"><a href="#todos">${later} more due later</a></p>`:""}</div>
-    <div><h3 class="sec">Coming up <span class="n">next 30 days</span></h3>${comingUpHTML()}<h3 class="sec" style="margin-top:18px">What changed</h3>${changesHTML()}</div>
+    <div><h3 class="sec">Coming up <span class="n">next 30 days</span></h3>${comingUpHTML()}</div>
   </section>
-  <div class="weekgrid"><div>${S.projects.length ? projectTableHTML(open, {grouped:true}) : emptyStart()}</div>${remindersPanelHTML()}</div>
+  <div class="weekgrid"><div>${S.projects.length ? projectTableHTML(open, {grouped:true}) : emptyStart()}</div>
+    <div class="wkside">${remindersPanelHTML()}<section><h3 class="sec">What changed</h3>${changesHTML()}</section></div></div>
   <p class="source">Source: Corp Dev weekly meetings${lm?`; last meeting ${esc(fmtDate(lm.date))}`:""}. Statuses: Active (ongoing), Pending (no update, or waiting on someone else).</p>`;
 }
 

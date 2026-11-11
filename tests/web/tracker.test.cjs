@@ -97,7 +97,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("no owner badge on the To-dos tab", (await p.textContent("#tagTodos")) === "");
 
   // reminders panel beside the table
-  ok("reminders panel beside the table", (await p.$$(".weekgrid > aside.reminders")).length === 1);
+  ok("reminders panel beside the table", (await p.$$(".weekgrid .wkside > aside.reminders")).length === 1);
   ok("reminder shows person and topic", (await p.textContent('.reminders .todo[data-id="r1"]')).includes("B. Sample: Schedule a meeting"));
   ok("reminders not counted as to-dos", tiles[2] === "3" && !(await p.$('section.cols .todo[data-id="r1"]')));
   ok("corp dev and stakeholders columns removed", (await p.$$eval("thead th", x => x.map(e => e.textContent).join("|"))) === "Project|Status|Description|This week's update|Last updated");
