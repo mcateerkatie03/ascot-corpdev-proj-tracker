@@ -50,7 +50,7 @@ async function add(username, name, initials) {
   if (!name) throw new Error('Give the person\'s full name, e.g. add wlane "Will Lane" WL');
   if (await profileOf(username)) return { username, name, initials: ini, password: null, note: "already exists (use reset)" };
   const pw = password();
-  const { data, error } = await sb.auth.admin.createUser({ email: email(username), password: pw, email_confirm: true, user_metadata: { username } });
+  const { data, error } = await sb.auth.admin.createUser({ email: email(username), password: pw, email_confirm: true, user_metadata: { username, must_reset: true } });
   if (error) {
     if (/invalid/i.test(error.message)) throw new Error(`Supabase rejected ${email(username)}: ${error.message}. Set USERNAME_DOMAIN to your company's domain (and the same value as a repository variable), then retry.`);
     throw error;
