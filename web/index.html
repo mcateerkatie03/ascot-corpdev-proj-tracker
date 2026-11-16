@@ -614,10 +614,11 @@ function remindersPanelHTML(){
 /* Project table, grouped by category, with the description on every row */
 /* Last updated: the meeting date the project's update came from (or the day it was edited by hand) */
 function lastUpdatedHTML(p){
-  if(!p.updateDate) return `<span class="t2">n/d</span>`;
+  const by=`<div class="t2">by ${esc(updaterName(p))}</div>`;
+  if(!p.updateDate) return `<div class="t2">n/d</div>${by}`;
   const d=-daysUntil(p.updateDate), late=isOpen(p)&&d>=QUIET_DAYS;
   const ago = d<=0 ? "today" : d<14 ? `${d} day${d===1?"":"s"} ago` : `${Math.floor(d/7)} weeks ago`;
-  return `<div>${esc(fmtDate(p.updateDate))}</div><div class="ago${late?" late":""}">${ago}</div>`;
+  return `<div>${esc(fmtDate(p.updateDate))}</div><div class="ago${late?" late":""}">${ago}</div>${by}`;
 }
 function projectTableHTML(list, {grouped, archive, noDate}={}){
   if(!list.length) return `<div class="empty"><p>No projects match.</p></div>`;
@@ -777,11 +778,11 @@ function eventFormHTML(dr,t){
   <div class="drawer-f">${dr.confirmDelete?`<span class="over">Delete this event?</span><button class="btn danger sm" data-act="del-yes">Delete</button><button class="btn sm" data-act="del-no">Keep</button>`:`<button class="btn danger" data-act="del-ask">Delete</button>`}
     <span class="sp"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="save-todo">Save changes</button></div>`;
 }
-async function addEvent({text, type, date, endDate, location, notes, quote, meetingId, meetingDate}, {quiet}={}){
+async function addEvent({text, type, date, endDate, location, notes, quote, meetingId, meetingDate}, {quiet, team}={}){
   text=String(text||"").trim(); if(!text){ toast("Give the event a name."); return false; }
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||""))){ toast("Choose the event's date."); return false; }
   const body={kind:"event", text, type:EVENT_TYPES.includes(type)?type:"Other", date, endDate:endDate&&endDate>date?endDate:"", location:location||"", notes:notes||"", quote:quote||"", done:false,
-    meetingId:meetingId||"", meetingDate:meetingDate||"", createdAt:Date.now(), createdBy:S.meId||"", ...meta()};
+    meetingId:meetingId||"", meetingDate:meetingDate||"", createdAt:Date.now(), createdBy:S.meId||"", ...(team?metaTeam():meta())};
   if(quiet){ await S.db.collection("todos").doc("e"+uid()).set(body,{quiet:true}); return true; }
   const ok=await guard(()=>S.db.collection("todos").doc("e"+uid()).set(body), "Event added");
   if(ok){ S.calMonth=date.slice(0,7); render(); }
@@ -899,7 +900,7 @@ function closeDrawer(){
   if(rec && parseHash().kind){ if(S.pushed){ S.pushed=false; history.back(); return; } history.replaceState(null,"","#"+S.view); }
 }
 const drHead = (kicker, title, extra) => `<div class="drawer-h"><div style="flex:1;min-width:0"><div class="kicker">${kicker}</div><h2 id="drTitle">${title}</h2>${extra||""}</div><button class="btn ghost" data-act="close" aria-label="Close">Close</button></div>`;
-function savedLine(r){ if(!r||!r.updatedAt) return ""; return `<div class="lastsaved">Last saved ${esc(fmtAgo(r.updatedAt))} by ${esc(nameOf(r._by||r.updatedBy, r.updatedByName))}</div>`; }
+function savedLine(r){ if(!r||!r.updatedAt) return ""; return `<div class="lastsaved">Last saved ${esc(fmtAgo(r.updatedAt))} by ${esc(updaterName(r))}</div>`; }
 function sel(id,opts,cur,blank){ return `<select id="${id}">${blank!=null?`<option value="">${esc(blank)}</option>`:""}${opts.map(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; return `<option value="${esc(v)}"${v===cur?" selected":""}>${esc(l)}</option>`; }).join("")}</select>`; }
 
 /* Project editor */
@@ -1044,6 +1045,15 @@ async function guard(fn, okMsg){
   }
 }
 const meta = () => ({updatedAt:Date.now(), updatedBy:S.meId||"", updatedByName:S.session?.name||""});
+const TEAM_NAME = "Corp Dev Team";
+/* Transcript imports and workbook imports are the team's, not one person's. */
+const metaTeam = () => ({updatedAt:Date.now(), updatedBy:S.meId||"", updatedByName:TEAM_NAME});
+/* Who last changed a record: the person's name for a hand edit, "Corp Dev Team" for a transcript/import or the old shared login. */
+function updaterName(r){
+  const n=(r&&r.updatedByName)||""; if(n && !/^corp dev team$/i.test(n)) return n;
+  const id=r&&(r._by||r.updatedBy); const p=id&&S.profiles[id];
+  return (p&&p.name && !/^corp dev team$/i.test(p.name)) ? p.name : TEAM_NAME;
+}
 const META_KEYS=["id","_v","_by"];
 function stripMeta(o){ const r={...(o||{})}; META_KEYS.forEach(k=>delete r[k]); return r; }
 const normV = v => v==null ? "" : v;
@@ -1340,7 +1350,7 @@ async function applyReview(){
   const dr=S.drawer, rv=dr.rv, date=dr.date, auto=!!(S.settings.claude&&S.settings.claude.autoCategory);
   const N=rv.n.filter(n=>n.take&&String(n.name).trim());
   if(!auto && N.some(n=>!n.catOk)){ toast("Tick \"The category is right\" for each new project, or change its category first."); return; }
-  const mid="m"+date; const m=meta(); let made=0;
+  const mid="m"+date; const m=metaTeam(); let made=0;
   const ok=await guard(async()=>{
     const nameToId={};
     for(const n of N){ const id="p"+uid(); nameToId[n.name]=id; const changed=n.category!==n.suggested;
@@ -1366,7 +1376,7 @@ async function applyReview(){
       await S.db.collection("todos").doc("k"+uid()).set({kind:"development", text:String(k.title||"").trim()||String(k.detail).trim().slice(0,120), notes:String(k.detail||"").trim(), topic:DEV_TOPICS.includes(k.topic)?k.topic:"Other", quote:k.quote||"", done:false,
         meetingId:mid, meetingDate:date, createdAt:Date.now(), createdBy:S.meId||"", ...m},{quiet:true}); made++; }
     for(const ev of rv.e.filter(x=>x.take&&String(x.title).trim()&&/^\d{4}-\d{2}-\d{2}$/.test(x.date))){
-      await addEvent({text:ev.title, type:ev.type, date:ev.date, endDate:ev.end_date, notes:ev.notes, quote:ev.quote, meetingId:mid, meetingDate:date},{quiet:true}); made++; }
+      await addEvent({text:ev.title, type:ev.type, date:ev.date, endDate:ev.end_date, notes:ev.notes, quote:ev.quote, meetingId:mid, meetingDate:date},{quiet:true, team:true}); made++; }
     for(const d of rv.d.filter(x=>x.take)){ try{ await S.db.collection("todos").doc(d.todo_id).update({done:true, doneAt:date, ...m},{quiet:true}); made++; }catch(e){ if(!(e&&e.code==="not_found")) throw e; } }
     await refetch("projects"); await refetch("todos");
     await saveMeeting(date,{summary:rv.summary, source:"transcript"});
@@ -1430,7 +1440,7 @@ async function parseWorkbook(file){
   return res;
 }
 async function importWorkbook(){
-  const p=S.drawer.parsed; if(!p) return; const m=meta(); let n=0;
+  const p=S.drawer.parsed; if(!p) return; const m=metaTeam(); let n=0;
   const ok=await guard(async()=>{
     const ids={};
     for(const r of p.current){ const id="p"+uid(); ids[r.name.toLowerCase()]=id;

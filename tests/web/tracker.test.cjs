@@ -185,6 +185,8 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("conflict panel shown", await p.isVisible(".conflict"));
   await p.click('[data-act="cf-pick"][data-c="mine"]'); await p.click('.conflict [data-act="save-project"]'); await p.waitForTimeout(200);
   ok("my value kept after choosing", (await doc(p, "projects", "p1")).update === "- My text");
+  ok("manual edit stamps the editor's name", (await doc(p, "projects", "p1")).updatedByName === "Zoe Tester");
+  ok("table shows last updated by", (await p.textContent('tr[data-id="p1"] td.lastupd')).includes("by Zoe Tester"));
 
   // filters
   await p.click('.fchip[data-act="pf"][data-v="Pending"]');
@@ -228,6 +230,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   const kes = P.find(x => x.name === "Project Kestrel");
   ok("edited update saved", P.find(x => x.id === "p1").update === "- Reviewed draft (edited)" && P.find(x => x.id === "p1").updateDate === dd(0));
   ok("status change saved", P.find(x => x.id === "p4").status === "Pending");
+  ok("transcript updates stamped as the team", P.find(x => x.id === "p1").updatedByName === "Corp Dev Team" && kes.updatedByName === "Corp Dev Team");
   ok("new project created with Claude's category", kes && kes.category === "External Growth Initiatives" && kes.categorySource === "claude" && kes.stage === "Screening" && kes.createdInMeeting === "m" + dd(0), kes);
   ok("archived as dropped", P.find(x => x.id === "p2").status === "Dropped" && P.find(x => x.id === "p2").closedAt === dd(0));
   ok("to-do linked to the new project", T.some(t => t.text === "Review Kestrel teaser" && t.projectId === kes.id && t.meetingId === "m" + dd(0)));
@@ -285,6 +288,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("statuses from the update text", by("Alpha Plan").status === "Active" && by("Beta Tracking").status === "Pending" && by("Gamma Cell").status === "Pending" && by("Town Hall").status === "Pending");
   ok("old projects archived", by("Old One").status === "Completed" && by("Old Two").status === "Dropped");
   ok("corp dev spacing normalised", by("Alpha Plan").corpDev === "WL / ZT");
+  ok("imported projects stamped as the team", by("Alpha Plan").updatedByName === "Corp Dev Team");
   ok("weekly snapshots imported", IM.map(m => m.date).sort().join(",") === "2026-10-27,2026-11-02", IM.map(m => m.date));
   ok("snapshot linked to project ids", IM.find(m => m.date === "2026-10-27").snapshot[0].id === by("Alpha Plan").id);
   await p.waitForTimeout(200);
