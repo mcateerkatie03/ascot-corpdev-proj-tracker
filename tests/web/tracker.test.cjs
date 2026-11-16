@@ -52,7 +52,7 @@ const PROPOSAL = {
   todos_done: [{ todo_id: "t1", reason: "Sent" }, { todo_id: "r1", reason: "Meeting booked" }],
 };
 
-async function page(b, { vp = { width: 1280, height: 900 }, seedRows = seed, hash = "#week", onFn } = {}) {
+async function page(b, { vp = { width: 1280, height: 900 }, seedRows = seed, hash = "#week", onFn, userMeta } = {}) {
   const p = await b.newPage({ viewport: vp, acceptDownloads: true });
   p.errs = []; p.on("pageerror", e => p.errs.push(String(e)));
   await p.route("**/*", r => {
@@ -66,6 +66,7 @@ async function page(b, { vp = { width: 1280, height: 900 }, seedRows = seed, has
     return r.fulfill({ status: 404, body: "" });
   });
   await p.addInitScript(s => { window.__seed = s; }, seedRows);
+  if (userMeta) await p.addInitScript(m => { window.__userMeta = m; }, userMeta);
   await p.goto(BASE + hash); await p.waitForTimeout(400);
   return p;
 }
@@ -385,6 +386,20 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
     if (w === 390) await m.screenshot({ path: path.join(OUT, "week-phone.png"), fullPage: true });
     await m.close();
   }
+  // first login: a one-time password forces the person to set their own
+  p = await page(b, { userMeta: { must_reset: true } });
+  ok("one-time password gate shown", await p.isVisible("#firstPwForm"));
+  ok("tabs hidden during the gate", (await p.$eval("#tabs", e => e.hidden)) === true);
+  ok("app not reachable during the gate", !(await p.$("section.tiles")));
+  await p.fill("#fp_new", "short"); await p.fill("#fp_again", "short"); await p.click("#firstPwForm button.primary"); await p.waitForTimeout(100);
+  ok("short password refused", (await p.textContent(".login")).includes("at least 12"));
+  await p.fill("#fp_new", "aLongEnoughPass1"); await p.fill("#fp_again", "differentPass123"); await p.click("#firstPwForm button.primary"); await p.waitForTimeout(100);
+  ok("mismatched passwords refused", (await p.textContent(".login")).includes("don't match"));
+  await p.fill("#fp_new", "aLongEnoughPass1"); await p.fill("#fp_again", "aLongEnoughPass1"); await p.click("#firstPwForm button.primary"); await p.waitForTimeout(300);
+  ok("after setting a password the app opens", (await p.$eval("#tabs", e => e.hidden)) === false && !!(await p.$("section.tiles")));
+  ok("one-time flag cleared", (await p.evaluate(() => window.__mock.userMeta.must_reset)) === false);
+  await p.close();
+
   await b.close();
   console.log(`${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

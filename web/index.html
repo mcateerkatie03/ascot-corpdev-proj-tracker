@@ -477,6 +477,7 @@ function render(){
   const wn=document.getElementById("whoName"); wn.textContent = S.session ? S.session.name : "";
   document.getElementById("whoMenuName").innerHTML = S.session ? `<b>${esc(S.session.name)}</b><span>${esc(S.session.username||"")}${S.session.initials?` · ${esc(S.session.initials)}`:""}</span>` : "";
   if(!S.session){ setMenu(false); const keep=[val("li_user")]; v.innerHTML=loginHTML(); const u=document.getElementById("li_user"); if(u&&keep[0]) u.value=keep[0]; renderDrawer(); return; }
+  if(S.mustReset){ document.getElementById("tabs").hidden=true; const keep=document.activeElement&&document.activeElement.id; v.innerHTML=firstPwHTML(); if(keep){ const e=document.getElementById(keep); if(e) e.focus(); } renderDrawer(); return; }
   document.querySelectorAll("nav.tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.view===S.view ? "page" : "false"));
   const mine=S.todos.filter(t=>!t.done && myInitials() && initialsList(t.owner).includes(myInitials())).length;
   document.getElementById("tagTodos").textContent = "";
@@ -1556,6 +1557,7 @@ document.addEventListener("keydown", e=>{
 document.addEventListener("submit", async e=>{ e.preventDefault();
   if(e.target.id==="loginForm"){ doLogin(); return; }
   if(e.target.id==="pwForm"){ savePassword(); return; }
+  if(e.target.id==="firstPwForm"){ setFirstPassword(); return; }
   if(e.target.id==="addEvForm"){ if(await addEvent({text:val("ne_text"), type:val("ne_type"), date:val("ne_date"), endDate:val("ne_end")})){ ["ne_text","ne_date","ne_end"].forEach(i=>{ const x=document.getElementById(i); if(x) x.value=""; }); } return; }
   if(e.target.id==="addDevForm"){ if(await addDevelopment({text:val("nd_text"), topic:val("nd_topic"), notes:val("nd_notes")})){ ["nd_text","nd_notes"].forEach(i=>{ const x=document.getElementById(i); if(x) x.value=""; }); document.getElementById("nd_text")?.focus(); } return; }
   if(e.target.id==="addRemForm"){ if(await addReminder({person:val("nr_person"), text:val("nr_text"), owner:""})){ const x=document.getElementById("nr_person"); if(x){ x.value=""; x.focus(); } } return; }
@@ -1608,6 +1610,7 @@ function stopData(){ if(S.channel){ S.sb.removeChannel(S.channel); S.channel=nul
 function toEmail(u){ u=u.trim().toLowerCase(); return u.includes("@") ? u : u+"@"+(CFG.usernameDomain||"corpdev-tracker.local"); }
 async function onSignedIn(session){
   S.meId=session.user.id;
+  S.mustReset = !!(session.user.user_metadata && session.user.user_metadata.must_reset);
   const {data, error}=await S.sb.from("profiles").select("username,display_name,initials").eq("id", session.user.id).maybeSingle();
   if(error || !data){ await S.sb.auth.signOut(); S.session=null; S.loginErr="This login isn't set up for the tracker yet. Ask the tracker owner."; render(); return; }
   S.session={username:data.username, name:data.display_name||data.username, initials:(data.initials||"").toUpperCase()};
@@ -1630,7 +1633,30 @@ async function doLogin(){
   }
   await onSignedIn(data.session);
 }
-async function signOut(){ try{ await S.sb.auth.signOut(); }catch{} stopData(); S.session=null; S.drawer=null; document.getElementById("whoDot").hidden=true; history.replaceState(null,"",location.pathname); render(); }
+async function signOut(){ try{ await S.sb.auth.signOut(); }catch{} stopData(); S.session=null; S.mustReset=false; S.drawer=null; document.getElementById("whoDot").hidden=true; history.replaceState(null,"",location.pathname); render(); }
+function firstPwHTML(){
+  return `<div class="login" role="region" aria-label="Set your password">
+    <div class="kicker">Welcome${S.session&&S.session.name?`, ${esc(S.session.name.split(/\s+/)[0])}`:""}</div><h2>Set your password</h2>
+    <p>You're signed in with a one-time password. Choose your own password to finish. You'll use it from now on; no one else can see it.</p>
+    <form id="firstPwForm" style="display:flex;flex-direction:column;gap:12px" novalidate>
+      <label class="f">New password <em>(at least 12 characters)</em><input type="password" id="fp_new" autocomplete="new-password"></label>
+      <label class="f">Repeat new password<input type="password" id="fp_again" autocomplete="new-password"></label>
+      ${S.loginErr?`<p class="err" role="alert">${esc(S.loginErr)}</p>`:""}
+      <div class="inline"><button class="btn primary" ${S.loginBusy?"disabled":""}>${S.loginBusy?"Saving…":"Save password and continue"}</button>
+        <button type="button" class="btn ghost" data-act="signout">Sign out</button></div>
+    </form></div>`;
+}
+async function setFirstPassword(){
+  if(S.loginBusy) return;
+  const a=document.getElementById("fp_new")?.value||"", b=document.getElementById("fp_again")?.value||"";
+  if(a.length<12){ S.loginErr="Use at least 12 characters."; render(); return; }
+  if(a!==b){ S.loginErr="The two passwords don't match."; render(); return; }
+  S.loginBusy=true; S.loginErr=""; render();
+  const {error}=await S.sb.auth.updateUser({password:a, data:{must_reset:false}});
+  S.loginBusy=false;
+  if(error){ S.loginErr=(error.message||"Couldn't set the password. Try again."); render(); return; }
+  S.mustReset=false; toast("Password set. You're all set."); render();
+}
 function loginHTML(){
   const wrap = inner => `<div class="login" role="region" aria-label="Sign in">${inner}</div>`;
   if(S.configMissing) return wrap(`<h2>Not connected yet</h2><p>This site has no database settings. Add the SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY repository variables and redeploy (see the README).</p>`);

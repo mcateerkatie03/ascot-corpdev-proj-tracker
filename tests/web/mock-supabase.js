@@ -24,6 +24,7 @@
   const presCbs = [];
   const M = window.__mock = {
     store, log, tracked:undefined, presenceState:{}, bumpBeforeNextUpdate:null, channels:[],
+    userMeta: (typeof window!=="undefined" && window.__userMeta) ? Object.assign({}, window.__userMeta) : {},
     seed(table, id, doc){ store[table][id] = {id, doc:clone(doc), updated_at:stamp(), updated_by:OTHER}; },
     hist, // tests can add past history rows: hist(table,id,op,old,new,by,isoTime)
     // Another user's save straight to the database (with or without the realtime ping)
@@ -107,11 +108,11 @@
   const client = {
     from: query,
     auth: {
-      async getSession(){ return {data:{session: M.signedOut ? null : {user:{id:ME}, access_token:"t"}}}; },
-      async signInWithPassword(){ return {data:{session:{user:{id:ME}}}, error:null}; },
+      async getSession(){ return {data:{session: M.signedOut ? null : {user:{id:ME, user_metadata:M.userMeta}, access_token:"t"}}}; },
+      async signInWithPassword(){ return {data:{session:{user:{id:ME, user_metadata:M.userMeta}}}, error:null}; },
       async signOut(){ M.signedOut = true; return {error:null}; },
       onAuthStateChange(){ return {data:{subscription:{unsubscribe(){}}}}; },
-      async updateUser(){ return {error:null}; }
+      async updateUser(u){ if(u&&u.data) M.userMeta=Object.assign({}, M.userMeta, u.data); return {error:null}; }
     },
     channel(name, opts){
       const ch = { name, opts,
