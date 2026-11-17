@@ -190,12 +190,13 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   { const pc = await page(b, {});
     await pc.evaluate(() => { window.__copied = null; window.__opened = []; Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } } }); window.open = (u) => { window.__opened.push(u); return null; }; });
     await pc.click('[data-act="import-tr"]'); await pc.waitForSelector("#trForm");
-    await pc.click('[data-act="tr-copilot"]'); await pc.waitForTimeout(100);
-    ok("empty transcript refused", (await pc.textContent("#trForm")).includes("Add the transcript first"));
+    await pc.click('[data-act="tr-copilot"]'); await pc.waitForTimeout(150);
+    { const c = await pc.evaluate(() => window.__copied); ok("no transcript copies the recording prompt", !!c && c.includes("attach an audio or video recording") && c.includes("No transcript is pasted"), c && c.slice(0, 60)); }
     const vtt = "WEBVTT\n\n1\n00:00:01.000 --> 00:00:04.000\n<v Will Lane>Kestrel teaser came in.</v>\n";
     await pc.setInputFiles("#f_tfile", { name: "meeting.vtt", mimeType: "text/vtt", buffer: Buffer.from(vtt) }); await pc.waitForTimeout(200);
     ok("vtt read into the box", (await pc.inputValue("#f_ttext")) === "Will Lane: Kestrel teaser came in.", await pc.inputValue("#f_ttext"));
     await pc.fill("#f_mdate", dd(0));
+    await pc.evaluate(() => { window.__copied = null; window.__opened = []; });
     await pc.click('[data-act="tr-copilot"]'); await pc.waitForTimeout(200);
     const copied = await pc.evaluate(() => window.__copied), opened = await pc.evaluate(() => window.__opened);
     ok("opens Microsoft 365 Copilot", opened.length === 1 && /m365\.cloud\.microsoft/.test(opened[0]), opened);

@@ -1286,14 +1286,14 @@ function renderHistory(){
 /* ---------- transcript: read with Claude, review, save ---------- */
 function transcriptHTML(dr){
   const head=drHead("Weekly meeting","Summarise a meeting with Copilot");
-  const prompt = dr.text ? copilotPrompt(dr.date||TODAY(), dr.text) : "";
+  const prompt = copilotPrompt(dr.date||TODAY(), dr.text||"");
   return `${head}
   <form class="drawer-b" id="trForm" novalidate>
-    <p style="margin:0">Your meeting data stays in Microsoft. In Teams, open the meeting's <b>Recap &gt; Transcript</b> and download it (.docx or .vtt), or paste the text below. Then <b>Copy for Copilot</b>: it copies a summary prompt and opens Microsoft 365 Copilot, where you paste it in (Ctrl+V). Copilot summarises the meeting into project updates, new projects, to-dos, reminders, key developments and events; you bring the results back and enter them here, by clicking a project's status or update to edit it and using the + boxes for to-dos, reminders and events. Nothing is sent to Claude, and nothing leaves your browser except what you paste into Copilot.</p>
+    <p style="margin:0">Your meeting data stays in Microsoft. In Teams, open the meeting's <b>Recap &gt; Transcript</b> and download it (.docx or .vtt), or paste the text below. Then <b>Copy for Copilot</b>: it copies a summary prompt and opens Microsoft 365 Copilot, where you paste it in (Ctrl+V). Copilot summarises the meeting into project updates, new projects, to-dos, reminders, key developments and events; you bring the results back and enter them here, by clicking a project's status or update to edit it and using the + boxes for to-dos, reminders and events. If your Teams transcription setting is off, leave the box blank, copy the prompt, and attach your audio or video recording in Copilot - it will transcribe it first. Nothing is sent to Claude, and nothing leaves your browser except what you paste into Copilot.</p>
     <div class="fgrid">
       <label class="f">Meeting date<input type="date" id="f_mdate" value="${esc(dr.date||TODAY())}"></label>
       <label class="f">Transcript file <em>(.docx, .vtt or .txt)</em><input type="file" id="f_tfile" accept=".docx,.vtt,.txt,text/plain,text/vtt,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
-      <label class="f full">Or paste the transcript<textarea id="f_ttext" rows="10" placeholder="Paste the meeting transcript here">${esc(dr.text||"")}</textarea></label>
+      <label class="f full">Or paste the transcript <em>(leave blank if you will attach a recording in Copilot)</em><textarea id="f_ttext" rows="10" placeholder="Paste the meeting transcript here, or leave blank and attach a recording in Copilot">${esc(dr.text||"")}</textarea></label>
     </div>
     <p class="t2" id="trInfo" style="margin:0">${dr.text?`${dr.text.length.toLocaleString("en-US")} characters`:""}</p>
     ${dr.err?`<p class="err" role="alert">${esc(dr.err)}</p>`:""}
@@ -1323,11 +1323,12 @@ function vttToText(raw){
   return out.join("\n");
 }
 function copilotPrompt(date, transcript){
+  transcript=String(transcript||"").trim();
   const open=S.projects.filter(isOpen).map(p=>`- ${p.name} [${CAT_SHORT[catOf(p)]||catOf(p)}, ${p.status||"Active"}]`).join("\n");
   const todos=allTodos().filter(t=>!t.done).map(t=>`- ${t.kind==="reminder"?`(follow up) ${t.person||""}: ${t.text||""}`:t.text}${t.due?` (due ${fmtDate(t.due)})`:""}`).join("\n");
   return [
-    `You are helping update the Ascot Corporate Development weekly project tracker from the meeting transcript below. Meeting date: ${date}.`,
-    `Summarise the meeting into the sections below, as short plain-text bullets I can copy into the tracker. Use sentence case. Do not invent anything that is not in the transcript. Speaker labels such as "Conference Room" are not people, and tasks have no owner.`,
+    `You are helping update the Ascot Corporate Development weekly project tracker from a meeting. Meeting date: ${date}.`,
+    `If I have attached an audio or video recording of the meeting (for example when Teams transcription is turned off), transcribe it first. Then summarise the meeting into the sections below, as short plain-text bullets I can copy into the tracker. Use sentence case. Do not invent anything that was not said. Speaker labels such as "Conference Room" are not people, and tasks have no owner.`,
     ``,
     `1. PROJECT UPDATES - for each existing project discussed, a one or two line update and whether it is now Active or Pending. Existing open projects:`,
     open||"(none yet)",
@@ -1342,19 +1343,17 @@ function copilotPrompt(date, transcript){
     `Open to-dos already tracked (so you can flag which are now done):`,
     todos||"(none)",
     ``,
-    `TRANSCRIPT:`,
-    transcript
+    transcript ? `TRANSCRIPT:\n${transcript}` : `(No transcript is pasted here. I will attach an audio or video recording of the meeting in Copilot - transcribe it first, then produce the summary above.)`
   ].join("\n");
 }
 async function copyForCopilot(){
   const dr=S.drawer; dr.date=val("f_mdate"); dr.text=(document.getElementById("f_ttext")?.value||"").trim();
   if(!/^\d{4}-\d{2}-\d{2}$/.test(dr.date)){ dr.err="Choose the meeting date."; rerenderDrawer(); return; }
-  if(!dr.text){ dr.err="Add the transcript first: drop the file or paste the text."; rerenderDrawer(); return; }
   dr.err="";
   let copied=false; try{ await navigator.clipboard.writeText(copilotPrompt(dr.date, dr.text)); copied=true; }catch{}
   try{ window.open(COPILOT_URL, "_blank", "noopener"); }catch{}
   dr.copied=copied; dr.rendered=false; renderDrawer();
-  toast(copied ? "Prompt copied. Paste it into Copilot with Ctrl+V, then enter the results here." : "Copilot opened. Copy the prompt from the box and paste it in.");
+  toast(copied ? (dr.text ? "Prompt copied. Paste it into Copilot with Ctrl+V." : "Prompt copied. In Copilot, paste it and attach your recording.") : "Copilot opened. Copy the prompt from the box and paste it in.");
 }
 
 /* ---------- workbook import (.xlsx) ---------- */
