@@ -11,7 +11,7 @@ The Corporate Development team's weekly project list, kept up to date from the t
 - **Key developments:** a running log of what came up in the meetings that isn't about a project on the list (industry trends, news about other companies, market and deal moves, regulation, Ascot news), grouped by meeting and filterable by topic. Claude picks them out of each transcript; you can add them by hand.
 - **Calendar:** a month view of company-wide events and holidays (town halls, strategy days, offsites, conferences, board meetings, investor events), colour-coded by type, with a list of the month's events underneath (the list only, on phones). Claude adds dated events it hears in each transcript; you can add them by hand, and download any event for Outlook. The dashboard shows the next 30 days under **Coming up**.
 - **Meetings:** one entry per weekly meeting with a snapshot of the list as it stood, like the dated tabs in the workbook.
-- **Import transcript:** drop in the meeting transcript (.docx or .vtt from Teams, or pasted text). Claude proposes status changes, new updates, new projects with a suggested category, projects to take off the list, new to-dos, people to follow up with, key developments, calendar events, and to-dos or reminders that are done. You review, edit and tick what to keep, then save. That records the meeting.
+- **Meeting → Copilot:** drop in the meeting transcript (.docx or .vtt from Teams, or pasted text) and click **Copy for Copilot**. The tracker copies a summary prompt and opens Microsoft 365 Copilot, where you paste it in. Copilot summarises the meeting into project updates, new projects, to-dos, reminders, key developments and events; you bring the results back and enter them (inline editing, and the + boxes). Nothing is sent to Claude or any third party: the transcript only reaches Copilot, inside your Microsoft 365, when you paste it. **Record meeting** saves that week’s snapshot.
 - **Import workbook / Export Excel:** bring in the existing project list once; download the current list any time in the same layout (Current, To-dos, Old Projects and one tab per week).
 
 **Statuses.** *Active*: ongoing. *Pending*: no update, or waiting on someone else. *Completed*: finished or sent out, comes off the list. *Dropped*: started but taken off the list without being completed. Projects under External Growth Initiatives can also carry an optional deal stage (Screening, NDA signed, LOI, Diligence, Closed, On hold, Dead).
@@ -26,7 +26,7 @@ For coding assistants: how the code works and the rules for changing it are in [
 | --- | --- | --- |
 | `web/` | GitHub Pages (static) | The site. Talks to Supabase from the browser. |
 | `supabase/migrations/0001_tracker.sql` | Supabase Postgres | Tables, logins, row-level security and change history. Every login can read and edit; anonymous visitors get nothing. |
-| `supabase/functions/transcript` | Supabase Edge Function | Sends a transcript and the current list to Claude and returns proposed changes. The Anthropic API key stays in its secrets. Nothing is written by the function, and the transcript isn't stored. |
+| (meetings) Copilot summary | In the browser | **Copy for Copilot** copies a prompt plus the transcript and opens Microsoft 365 Copilot. No server call; the data reaches only Copilot, when you paste it. |
 | `supabase/functions/digest` | Supabase Edge Function | Optional Monday email: overdue to-dos, to-dos due this week, pending and quiet projects, what changed. Sent through Resend on a Supabase Cron schedule. |
 | `scripts/logins.mjs` | Your machine | Creates, resets and removes logins with the Supabase secret key. |
 | `.github/workflows/pages.yml` | GitHub Actions | Writes `web/config.js` from repository variables and publishes `web/` to Pages. |
@@ -41,31 +41,9 @@ For coding assistants: how the code works and the rules for changing it are in [
 3. **Authentication > Sign In / Providers > Email:** keep Email enabled and turn **off** "Allow new users to sign up". Logins are created only by the script.
 4. **Project settings > API Keys:** note the **publishable key** (`sb_publishable_...`, safe for the website) and the **secret key** (`sb_secret_...`, only for the login script on your computer). The Project URL is under **Project settings > Data API**. Never put the secret key in the site or in GitHub.
 
-### 2. Transcript reader (Claude)
+### 2. Meeting summaries (Microsoft 365 Copilot)
 
-Needs the [Supabase CLI](https://supabase.com/docs/guides/cli) and an Anthropic API key from [console.anthropic.com](https://console.anthropic.com).
-
-```bash
-supabase login
-```
-
-```bash
-supabase link --project-ref YOUR_PROJECT_REF
-```
-
-```bash
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-... ALLOWED_ORIGIN=https://YOUR_GITHUB_USER.github.io
-```
-
-```bash
-supabase functions deploy transcript --no-verify-jwt
-```
-
-`--no-verify-jwt` is safe: the function checks the caller's login itself and only answers tracker logins.
-
-It uses Claude Opus 5.5 with structured output, so the answer always comes back in the shape the review screen expects. Anthropic's server-side fallback is switched on: if Opus 5.5's safety checks decline a transcript, the API retries it on Anthropic's recommended fallback model. To use another model, set the secret `CLAUDE_MODEL`. A one-hour meeting transcript usually costs well under $1 to read.
-
-Reading takes one to three minutes. Supabase stops a function after 150 seconds on the free plan (400 seconds on paid plans), so if long transcripts time out, either move to a paid plan or import the transcript in two halves.
+No setup and no AI service to pay for. The tracker never sends meeting data to any third party; it only prepares a prompt you paste into your own Microsoft 365 Copilot, so the data stays inside Ascot’s Microsoft tenant. Each person uses Copilot with their own Microsoft sign-in (a Copilot licence is needed to use Copilot itself).
 
 ### 3. Logins
 
@@ -104,9 +82,9 @@ The preview shows what will be imported before anything is saved. The workbook s
 ## Each week
 
 1. After the meeting, open **Recap > Transcript** in Teams and download it (.docx or .vtt).
-2. In the tracker, **This week > Import transcript**: check the meeting date, drop the file in and click **Read with Claude**.
-3. Review the proposals: edit any text, change a status or category, untick anything you don't want. For new projects, confirm the category (unless automatic filing is on).
-4. **Save and record the meeting.** The dashboard switches to the new week, and the meeting's snapshot is saved under **Meetings**.
+2. In the tracker, **This week > Meeting → Copilot**: check the meeting date, drop the file in, and click **Copy for Copilot**. It copies a summary prompt and opens Microsoft 365 Copilot.
+3. In Copilot, paste (Ctrl+V) and send. It returns the meeting organised into updates, new projects, to-dos, reminders, key developments and events.
+4. Back in the tracker, enter the results: click a project’s status or update to edit it in place, and use the + boxes for to-dos, reminders and calendar events. Click **Record meeting** to save that week’s snapshot.
 
 Projects not discussed keep last week's update. They're tagged *Quiet* after three weeks without one. You can edit anything by hand at any time, and **Save a snapshot without a transcript** (on Meetings) records a week you updated by hand.
 
@@ -147,11 +125,11 @@ Fill in `web/config.js` with the Project URL and publishable key, then:
 npm run serve
 ```
 
-Open http://localhost:8080. To use the transcript reader locally, set `ALLOWED_ORIGIN` to `*` while testing.
+Open http://localhost:8080.
 
 ## Notes
 
 - **Data model:** each project, to-do and meeting is a JSON document (`id`, `doc`), so fields can change without migrations. `updated_at` and `updated_by` are stamped by the database, and a trigger records every change to projects and to-dos in `history`.
 - **Two people at once:** a save only sends the fields you changed. If someone else changed the same field while you were editing, the page asks whose value to keep. Open pages refresh within a second when anyone saves.
-- **Confidentiality:** transcripts are sent to Anthropic's API to be read and are not stored by the tracker. Anthropic doesn't train on API data by default. Real workbooks and transcripts must never be committed to this repository (`.gitignore` blocks .xlsx, .docx and .vtt files).
-- **Costs:** Supabase free tier, GitHub Pages, and Anthropic API usage for transcripts (cents to under a dollar a week).
+- **Confidentiality:** the running site sends no meeting or project data to Claude or any AI service. Meeting summaries go only to your own Microsoft 365 Copilot, when you paste the prompt in. Project data lives in Supabase, behind the login. Real workbooks and transcripts must never be committed to this repository (`.gitignore` blocks .xlsx, .docx and .vtt files).
+- **Costs:** Supabase free tier and GitHub Pages. Meeting summaries use your existing Microsoft 365 Copilot; nothing is billed through this site.

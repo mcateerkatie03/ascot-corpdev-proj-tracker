@@ -33,24 +33,6 @@ const seed = [
   ["meetings", "m" + PREV, { date: PREV, title: "Weekly meeting", source: "import", snapshot: [] }],
 ];
 
-const PROPOSAL = {
-  summary: "Sample summary of the meeting.",
-  project_updates: [
-    { project_id: "p1", update: "- Reviewed draft\n- ZT to circulate", status: "", stage: "", description: "", stakeholders: "", corp_dev: "", reason: "Discussed" },
-    { project_id: "p4", update: "- Slides sent", status: "Pending", stage: "", description: "", stakeholders: "", corp_dev: "", reason: "Waiting on HR" },
-  ],
-  new_projects: [{ name: "Project Kestrel", category: "External Growth Initiatives", category_reason: "Minority stake in an external MGA", quarter: "", description: "Sample MGA minority stake", stakeholders: "B. Sample", corp_dev: "WL", update: "- Teaser received", status: "Active", stage: "Screening" }],
-  archive: [{ project_id: "p2", status: "Dropped", reason: "Partner withdrew" }],
-  todos: [
-    { text: "Review Kestrel teaser", owner: "WL", project_ref: "Project Kestrel", due: dd(3), quote: "WL will look at the teaser" },
-    { text: "Circulate Harbor draft", owner: "ZT", project_ref: "p1", due: "", quote: "" },
-    { text: "Unwanted item", owner: "", project_ref: "", due: "", quote: "" },
-  ],
-  events: [{ title: "Investor day", type: "Investor event", date: dd(20), end_date: "", notes: "New York", quote: "investor day on the date" }, { title: "Global town hall", type: "Town hall", date: dd(5), end_date: "", notes: "", quote: "" }],
-  developments: [{ title: "Sample peer announced a sidecar", detail: "Discussed as a sign of more third-party capital.", topic: "Market and deals", quote: "they announced a sidecar" }],
-  reminders: [{ person: "C. Person", about: "Check when he's back in New York", owner: "ZT", project_ref: "p1", due: "", quote: "check with C. Person" }],
-  todos_done: [{ todo_id: "t1", reason: "Sent" }, { todo_id: "r1", reason: "Meeting booked" }],
-};
 
 async function page(b, { vp = { width: 1280, height: 900 }, seedRows = seed, hash = "#week", onFn, userMeta } = {}) {
   const p = await b.newPage({ viewport: vp, acceptDownloads: true });
@@ -204,72 +186,24 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("search keeps focus", await p.evaluate(() => document.activeElement.id === "q"));
   await p.close();
 
-  // ---- Transcript: read with Claude, review, save
-  let sent = null;
-  p = await page(b, { onFn: async r => { sent = JSON.parse(r.request().postData()); await new Promise(res => setTimeout(res, 150)); r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ proposal: PROPOSAL }) }); } });
-  await p.click('[data-act="import-tr"]'); await p.waitForSelector("#trForm");
-  await p.click('[data-act="tr-read"]'); await p.waitForTimeout(100);
-  ok("empty transcript refused", (await p.textContent("#trForm")).includes("Add the transcript first"));
-  const vtt = "WEBVTT\n\n1\n00:00:01.000 --> 00:00:04.000\n<v Will Lane>Kestrel teaser came in.</v>\n\n2\n00:00:04.000 --> 00:00:06.000\n<v Will Lane>I'll look at it.</v>\n\n3\n00:00:06.000 --> 00:00:09.000\n<v Zoe Tester>Harbor draft is done.</v>\n";
-  await p.setInputFiles("#f_tfile", { name: "meeting.vtt", mimeType: "text/vtt", buffer: Buffer.from(vtt) }); await p.waitForTimeout(200);
-  const txt = await p.inputValue("#f_ttext");
-  ok("vtt read into speaker lines", txt === "Will Lane: Kestrel teaser came in. I'll look at it.\nZoe Tester: Harbor draft is done.", txt);
-  const zip = new JSZip(); zip.file("word/document.xml", '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Will Lane   0:03</w:t></w:r></w:p><w:p><w:r><w:t>Kestrel </w:t></w:r><w:r><w:t>teaser.</w:t></w:r></w:p></w:body></w:document>');
-  await p.setInputFiles("#f_tfile", { name: "meeting.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", buffer: await zip.generateAsync({ type: "nodebuffer" }) }); await p.waitForTimeout(300);
-  ok("docx read", (await p.inputValue("#f_ttext")) === "Will Lane   0:03\nKestrel teaser.", await p.inputValue("#f_ttext"));
-  await p.fill("#f_mdate", dd(0));
-  await p.click('[data-act="tr-read"]'); await p.waitForSelector(".busy");
-  ok("busy state while Claude reads", await p.isVisible(".busy"));
-  await p.waitForSelector("#rvBody");
-  ok("request carries open projects only", sent && sent.projects.map(x => x.id).sort().join(",") === "p1,p2,p3,p4", sent && sent.projects.map(x => x.id));
-  ok("request carries categorised examples incl. archived", sent.examples.some(e => e.name === "Old Sample Deal"));
-  ok("request carries open to-dos, reminders and team initials, not developments", sent.openTodos.length === 4 && sent.openTodos.some(t => t.text === "Reminder: follow up with B. Sample: Schedule a meeting") && sent.team.some(t => t.initials === "WL"), sent.openTodos);
-  ok("review lists all sections", (await p.$$eval("#rvBody h3.sec", x => x.map(e => e.textContent.replace(/\s*\d+$/, "").trim()).join("|"))) === "Project updates|New projects|Take off the list|To-dos for the week|Reminders: people to follow up with|Key developments|Calendar events|Open to-dos and reminders the meeting said are done");
-  ok("old update shown for comparison", (await p.textContent("#rvBody .rv .old")).includes("Draft out"));
-  ok("Claude's category reason shown", (await p.textContent("#rvBody")).includes("Minority stake in an external MGA"));
-  await p.uncheck('[data-rv="t.2.take"]');
-  await p.fill('[data-rv="u.0.update"]', "- Reviewed draft (edited)");
-  await p.click('[data-act="tr-save"]'); await p.waitForTimeout(150);
-  ok("category must be confirmed before saving", (await docs(p, "projects")).length === 5);
-  await p.check('[data-rv="n.0.catOk"]');
-  await p.click('[data-act="tr-save"]'); await p.waitForTimeout(600);
-  const P = await docs(p, "projects"), T = await docs(p, "todos"), M = await docs(p, "meetings");
-  const kes = P.find(x => x.name === "Project Kestrel");
-  ok("edited update saved", P.find(x => x.id === "p1").update === "- Reviewed draft (edited)" && P.find(x => x.id === "p1").updateDate === dd(0));
-  ok("status change saved", P.find(x => x.id === "p4").status === "Pending");
-  ok("transcript updates stamped as the team", P.find(x => x.id === "p1").updatedByName === "Corp Dev Team" && kes.updatedByName === "Corp Dev Team");
-  ok("new project created with Claude's category", kes && kes.category === "External Growth Initiatives" && kes.categorySource === "claude" && kes.stage === "Screening" && kes.createdInMeeting === "m" + dd(0), kes);
-  ok("archived as dropped", P.find(x => x.id === "p2").status === "Dropped" && P.find(x => x.id === "p2").closedAt === dd(0));
-  ok("to-do linked to the new project", T.some(t => t.text === "Review Kestrel teaser" && t.projectId === kes.id && t.meetingId === "m" + dd(0)));
-  ok("unticked to-do not saved", !T.some(t => t.text === "Unwanted item"));
-  ok("done to-do marked", T.find(t => t.id === "t1").done === true);
-  ok("reminder from the transcript saved", T.some(t => t.kind === "reminder" && t.person === "C. Person" && t.text === "Check when he's back in New York" && t.projectId === "p1" && t.meetingId === "m" + dd(0)));
-  ok("reminder the meeting closed is done", T.find(t => t.id === "r1").done === true);
-  ok("calendar event from the transcript saved", T.some(t => t.kind === "event" && t.text === "Investor day" && t.type === "Investor event" && t.date === dd(20) && t.notes === "New York"));
-  ok("event already on the calendar not added twice", T.filter(t => t.kind === "event" && t.text === "Global town hall").length === 1);
-  ok("key development from the transcript saved", T.some(t => t.kind === "development" && t.text === "Sample peer announced a sidecar" && t.topic === "Market and deals" && t.notes.startsWith("Discussed") && t.meetingId === "m" + dd(0)));
-  const mt = M.find(m => m.id === "m" + dd(0));
-  ok("meeting recorded with snapshot incl. the dropped project", mt && mt.summary === "Sample summary of the meeting." && mt.snapshot.some(s => s.id === "p2" && s.status === "Dropped") && mt.snapshot.some(s => s.name === "Project Kestrel"), mt);
-  await p.waitForTimeout(200);
-  ok("dashboard shows the new meeting", (await p.textContent(".action-title")).includes("Week of"));
-  ok("new tag on the new project", !!(await p.$(`tr[data-id="${kes.id}"] .tag.new`)));
-  await p.close();
-
-  // automatic filing: no confirmation needed, project tagged to check
-  p = await page(b, { seedRows: [...seed, ["settings", "claude", { autoCategory: true }]], onFn: r => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ proposal: { ...PROPOSAL, project_updates: [], archive: [], todos: [], todos_done: [] } }) }) });
-  await p.click('[data-act="import-tr"]'); await p.fill("#f_ttext", "Some text"); await p.click('[data-act="tr-read"]'); await p.waitForSelector("#rvBody");
-  ok("no confirm box when filing automatically", !(await p.$('[data-rv="n.0.catOk"]')));
-  await p.click('[data-act="tr-save"]'); await p.waitForTimeout(500);
-  const k2 = (await docs(p, "projects")).find(x => x.name === "Project Kestrel");
-  ok("auto-filed project tagged to check", k2 && k2.categoryCheck === true);
-  ok("check-category tag on dashboard", !!(await p.$(`tr[data-id="${k2.id}"] .tag.chk`)));
-  await p.close();
-
-  // error from the function is shown, form kept
-  p = await page(b, { onFn: r => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "The transcript reader has no Anthropic API key yet." }) }) });
-  await p.click('[data-act="import-tr"]'); await p.fill("#f_ttext", "Hello"); await p.click('[data-act="tr-read"]'); await p.waitForTimeout(300);
-  ok("function error shown and text kept", (await p.textContent("#trForm")).includes("no Anthropic API key") && (await p.inputValue("#f_ttext")) === "Hello");
-  await p.close();
+  // ---- Meeting summary via Copilot (no data leaves the browser)
+  { const pc = await page(b, {});
+    await pc.evaluate(() => { window.__copied = null; window.__opened = []; Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } } }); window.open = (u) => { window.__opened.push(u); return null; }; });
+    await pc.click('[data-act="import-tr"]'); await pc.waitForSelector("#trForm");
+    await pc.click('[data-act="tr-copilot"]'); await pc.waitForTimeout(100);
+    ok("empty transcript refused", (await pc.textContent("#trForm")).includes("Add the transcript first"));
+    const vtt = "WEBVTT\n\n1\n00:00:01.000 --> 00:00:04.000\n<v Will Lane>Kestrel teaser came in.</v>\n";
+    await pc.setInputFiles("#f_tfile", { name: "meeting.vtt", mimeType: "text/vtt", buffer: Buffer.from(vtt) }); await pc.waitForTimeout(200);
+    ok("vtt read into the box", (await pc.inputValue("#f_ttext")) === "Will Lane: Kestrel teaser came in.", await pc.inputValue("#f_ttext"));
+    await pc.fill("#f_mdate", dd(0));
+    await pc.click('[data-act="tr-copilot"]'); await pc.waitForTimeout(200);
+    const copied = await pc.evaluate(() => window.__copied), opened = await pc.evaluate(() => window.__opened);
+    ok("opens Microsoft 365 Copilot", opened.length === 1 && /m365\.cloud\.microsoft/.test(opened[0]), opened);
+    ok("prompt carries the sections, the project list and the transcript", !!copied && copied.includes("PROJECT UPDATES") && copied.includes("KEY DEVELOPMENTS") && copied.includes("Harbor Review") && copied.includes("Kestrel teaser came in"), copied && copied.slice(0, 60));
+    await pc.click('[data-act="record-meeting"]'); await pc.waitForTimeout(300);
+    const M = await docs(pc, "meetings");
+    ok("record meeting saves a snapshot", M.some(m => m.id === "m" + dd(0) && (m.snapshot || []).length >= 1), M.map(m => m.id));
+    await pc.close(); }
 
   // ---- Workbook import into an empty tracker, then export
   const wb = XLSX.utils.book_new();
