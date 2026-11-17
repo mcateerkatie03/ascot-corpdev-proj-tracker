@@ -184,6 +184,16 @@ td.lastupd{white-space:nowrap;min-width:96px}
 td.lastupd .ago{font-size:12px;color:var(--muted)}
 td.lastupd .ago.late{color:var(--magenta);font-weight:bold}
 .clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+/* Inline editing on the project tables */
+.cell-edit{cursor:pointer;border-radius:0}
+.cell-edit.block{display:block}
+.cell-edit:hover,.cell-edit:focus-visible{outline:1px dashed var(--blue);outline-offset:2px;background:var(--alt)}
+.namecell:hover,.namecell:focus-visible{color:var(--magenta)}
+.morebtn{margin-top:6px;padding:2px 8px;font-size:11px;color:var(--blue);border-color:var(--grid)}
+.morebtn:hover{border-color:var(--ink);background:var(--tile)}
+#inlineInput{width:100%;font:inherit;padding:5px 7px;border:1px solid var(--magenta);background:var(--surface);border-radius:0}
+select#inlineInput{min-width:130px;width:auto;max-width:100%}
+textarea#inlineInput{min-height:72px;resize:vertical}
 .prose{white-space:pre-wrap;margin:0;overflow-wrap:anywhere}
 tr.cathead td{background:var(--tile)!important;border-top:2px solid var(--ink);font-weight:bold;font-size:13px;cursor:default}
 .tag{display:inline-block;font-size:10px;font-weight:bold;letter-spacing:.05em;text-transform:uppercase;padding:0 5px;margin-left:6px;vertical-align:1px;white-space:nowrap}
@@ -403,7 +413,7 @@ const S = {
   view:"week", sb:null, db:null, meId:null, session:null, authChecked:false, started:false, channel:null, loginErr:"", loginBusy:false,
   projects:[], todos:[], reminders:[], developments:[], events:[], meetings:[], loaded:{projects:false,todos:false,meetings:false}, stale:false, configMissing:false,
   profiles:{}, settings:{}, hist:{}, changes:null,
-  q:"", pf:"open", pcat:"all", ppl:"all", tf:"open", tpl:"all", aq:"", dq:"", dtopic:"all", calMonth:"", etype:"all", drawer:null
+  q:"", pf:"open", pcat:"all", ppl:"all", tf:"open", tpl:"all", aq:"", dq:"", dtopic:"all", calMonth:"", etype:"all", drawer:null, inlineEdit:null
 };
 
 /* ---------- helpers ---------- */
@@ -621,18 +631,56 @@ function lastUpdatedHTML(p){
   const ago = d<=0 ? "today" : d<14 ? `${d} day${d===1?"":"s"} ago` : `${Math.floor(d/7)} weeks ago`;
   return `<div>${esc(fmtDate(p.updateDate))}</div><div class="ago${late?" late":""}">${ago}</div>${by}`;
 }
-function projectTableHTML(list, {grouped, archive, noDate}={}){
+/* Inline editing: click a cell to edit it in place; "More" opens the full editor drawer. */
+const inlineEditing = (id,field) => S.inlineEdit && S.inlineEdit.id===id && S.inlineEdit.field===field;
+function inlineControl(p, field, kind){
+  const v = p[field]!=null ? p[field] : "";
+  if(kind==="status") return `<select id="inlineInput" aria-label="Status">${STATUSES.map(s=>`<option${s===(p.status||"Active")?" selected":""}>${esc(s)}</option>`).join("")}</select>`;
+  if(kind==="textarea") return `<textarea id="inlineInput" aria-label="${esc(field)}" rows="4">${esc(v)}</textarea>`;
+  return `<input type="text" id="inlineInput" aria-label="${esc(field)}" value="${esc(v)}">`;
+}
+function editable(p, field, kind, display, cls){
+  if(inlineEditing(p.id, field)) return inlineControl(p, field, kind);
+  const tag = kind==="textarea" ? "div" : "span";
+  return `<${tag} class="cell-edit${cls?" "+cls:""}" data-act="inline" data-id="${esc(p.id)}" data-field="${field}" tabindex="0" role="button" title="Click to edit">${display}</${tag}>`;
+}
+function startInline(id, field){ S.inlineEdit={id, field}; render();
+  const el=document.getElementById("inlineInput"); if(el){ el.focus(); if(field==="name"&&el.select){ try{ el.select(); }catch{} } } }
+function commitInline(cancel){
+  const ed=S.inlineEdit; if(!ed) return; const el=document.getElementById("inlineInput"); const raw=el?el.value:null;
+  S.inlineEdit=null;
+  const done=()=>setTimeout(()=>{ if(!S.inlineEdit) render(); },0);
+  if(cancel||raw==null){ done(); return; }
+  const p=projById(ed.id); if(!p){ done(); return; }
+  const v = ed.field==="name" ? raw.trim() : raw;
+  if(ed.field==="name" && !v){ toast("Give the project a name."); done(); return; }
+  if(same(v, p[ed.field]!=null?p[ed.field]:"")){ done(); return; }
+  const patch={[ed.field]:v, ...meta()};
+  if(ed.field==="update") patch.updateDate=TODAY();
+  if(ed.field==="status"){ if(OPEN.includes(v)) patch.closedAt=""; else if(OPEN.includes(p.status||"Active")) patch.closedAt=TODAY(); }
+  Object.assign(p, patch); done();
+  S.db.collection("projects").doc(ed.id).update(patch,{quiet:true}).then(()=>toast("Saved"),async e=>{ await guard(()=>{throw e;}); await refetch("projects"); });
+}
+function projectTableHTML(list, {grouped, archive, noDate, noEdit}={}){
   if(!list.length) return `<div class="empty"><p>No projects match.</p></div>`;
   const cats=[...CATEGORIES, NO_CAT];
   const sorted=[...list].sort((a,b)=>cats.indexOf(catOf(a))-cats.indexOf(catOf(b)) || String(a.quarter||"").localeCompare(String(b.quarter||"")) || (a.order??1e9)-(b.order??1e9) || String(a.name).localeCompare(String(b.name)));
-  const row = p => `<tr class="click" data-act="open-project" data-id="${esc(p.id)}" tabindex="0">
+  const row = p => noEdit ? `<tr class="click" data-act="open-project" data-id="${esc(p.id)}" tabindex="0">
     <td><div class="t1">${esc(p.name)}${archive?"":projTags(p)}</div>${archive?`<div class="t2">${esc(CAT_SHORT[catOf(p)]||catOf(p))}</div>`:""}${p.quarter?`<div class="t2">${esc(p.quarter)}</div>`:""}${p.stage&&catOf(p)===EXTERNAL?`<span class="stage">Deal stage: ${esc(p.stage)}</span>`:""}
       ${p.description?`<div class="t2 mob">${esc(p.description)}</div>`:""}</td>
     <td class="c-side">${statusPill(p.status)}${archive&&p.closedAt?`<div class="t2">${esc(fmtDate(p.closedAt))}</div>`:""}</td>
     <td class="desc c-hide"><div class="clamp prose">${esc(p.description||"")||'<span class="t2">No description</span>'}</div></td>
     <td class="upd c-full" data-label="${archive?"Last update":"Update"}">${p.update?`<div class="prose clamp">${esc(p.update)}</div>`:'<span class="t2">No update yet</span>'}</td>
     ${noDate?"":`<td class="lastupd c-full" data-label="Last updated">${lastUpdatedHTML(p)}</td>`}
-</tr>`;
+  </tr>` : `<tr data-id="${esc(p.id)}">
+    <td><div class="t1">${editable(p,"name","text",esc(p.name),"namecell")}${archive?"":projTags(p)}</div>${archive?`<div class="t2">${esc(CAT_SHORT[catOf(p)]||catOf(p))}</div>`:""}${p.quarter?`<div class="t2">${esc(p.quarter)}</div>`:""}${p.stage&&catOf(p)===EXTERNAL?`<span class="stage">Deal stage: ${esc(p.stage)}</span>`:""}
+      ${p.description?`<div class="t2 mob">${esc(p.description)}</div>`:""}
+      <button type="button" class="btn sm ghost morebtn" data-act="open-project" data-id="${esc(p.id)}">More &#9656;</button></td>
+    <td class="c-side" data-label="Status">${editable(p,"status","status",statusPill(p.status))}${archive&&p.closedAt?`<div class="t2">${esc(fmtDate(p.closedAt))}</div>`:""}</td>
+    <td class="desc c-hide">${editable(p,"description","textarea",`${esc(p.description||"")||'<span class="t2">No description</span>'}`,"block prose clamp")}</td>
+    <td class="upd c-full" data-label="${archive?"Last update":"Update"}">${editable(p,"update","textarea",`${p.update?esc(p.update):'<span class="t2">No update yet</span>'}`,"block prose"+(p.update?" clamp":""))}</td>
+    ${noDate?"":`<td class="lastupd c-full" data-label="Last updated">${lastUpdatedHTML(p)}</td>`}
+  </tr>`;
   let body=""; const cols=noDate?4:5;
   if(grouped){ for(const c of cats){ const g=sorted.filter(p=>catOf(p)===c); if(!g.length && (c===NO_CAT || archive)) continue;
       body+=`<tr class="cathead"><td colspan="${cols}">${esc(c)} <span class="t2">(${g.length})</span></td></tr>`+(g.length?g.map(row).join(""):`<tr><td colspan="${cols}" class="t2">None at the moment.</td></tr>`); } }
@@ -659,7 +707,7 @@ function renderProjects(){
   const f={open:isOpen,Active:p=>p.status!=="Pending"&&isOpen(p),Pending:p=>p.status==="Pending",quiet:p=>isOpen(p)&&(quietDays(p)??0)>=QUIET_DAYS}[S.pf]||isOpen;
   const rows=base.filter(f).filter(p=>S.pcat==="all"||catOf(p)===S.pcat).filter(p=>S.ppl==="all"||initialsList(p.corpDev).includes(S.ppl));
   return `
-  <section class="pagehead"><div><h2 class="action-title">Projects</h2><p class="sub">Everything on the list, grouped by category. Open a project to edit it; changes save to the shared tracker straight away.</p></div></section>
+  <section class="pagehead"><div><h2 class="action-title">Projects</h2><p class="sub">Everything on the list, grouped by category. Click a status, name, description or update to edit it in place; use <b>More</b> for the full project. Changes save straight away.</p></div></section>
   <section class="toolbar"><div class="grow"><input type="search" id="q" placeholder="Search projects, descriptions and updates" aria-label="Search projects" value="${esc(S.q)}"></div>
     <button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn primary" data-act="new-project">New project</button></section>
   ${S.projects.length?projectFilterChips(base)+projectTableHTML(rows,{grouped:true}):emptyStart()}
@@ -983,7 +1031,7 @@ function meetingHTML(dr){
   return `${drHead("Weekly meeting", esc(fmtDate(m.date))+(m.title?`: ${esc(m.title)}`:""))}
   <div class="drawer-b">
     ${m.summary?`<div><h3 class="sec">Summary</h3><p class="prose">${esc(m.summary)}</p></div>`:""}
-    <div><h3 class="sec">Project list as it stood</h3>${snap.length?projectTableHTML(snap.map(s=>({...s, updateDate:"", createdInMeeting:null})),{grouped:true,archive:false,noDate:true}).replace(/data-act="open-project"/g,'data-act="open-project-snap"'):'<p class="t2">No snapshot.</p>'}</div>
+    <div><h3 class="sec">Project list as it stood</h3>${snap.length?projectTableHTML(snap.map(s=>({...s, updateDate:"", createdInMeeting:null})),{grouped:true,archive:false,noDate:true,noEdit:true}).replace(/data-act="open-project"/g,'data-act="open-project-snap"'):'<p class="t2">No snapshot.</p>'}</div>
     <div><h3 class="sec">To-dos from this meeting</h3>${todoListHTML(todos,{showProject:true})}</div>
     ${S.developments.some(d=>d.meetingId===m.id)?`<div><h3 class="sec">Key developments</h3>${devCardsHTML(S.developments.filter(d=>d.meetingId===m.id))}</div>`:""}
   </div>
@@ -1510,6 +1558,7 @@ document.addEventListener("click", async e=>{
     case "cal-open": await openCalendar(id, +t.dataset.h, "outlook"); break;
     case "cal-ics": await openCalendar(id, +t.dataset.h, "ics"); break;
     case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "af": case "acat": case "dtopic": case "etype": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
+    case "inline": startInline(id, t.dataset.field); break;
     case "open-project": goRecord("project",id); break;
     case "open-project-snap": if(id&&projById(id)){ S.drawer=null; goRecord("project",id); } break;
     case "open-todo": goRecord("todo",id); break;
@@ -1552,7 +1601,11 @@ document.addEventListener("keydown", e=>{
         else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); } } } }
   if(e.key==="Escape" && S.menuOpen){ setMenu(false); document.getElementById("whoDot").focus(); return; }
   if(e.key==="Escape" && S.drawer && S.drawer.step!=="busy") closeDrawer();
-  if(e.key==="Enter" && e.target.matches("tr.click, li.click, .todo .tx")) e.target.click();
+  if(e.target.id==="inlineInput"){
+    if(e.key==="Escape"){ e.preventDefault(); commitInline(true); return; }
+    if(e.key==="Enter"){ if(e.target.tagName!=="TEXTAREA" || e.ctrlKey || e.metaKey){ e.preventDefault(); commitInline(false); } return; }
+  }
+  if(e.key==="Enter" && e.target.matches("tr.click, li.click, .todo .tx, .cell-edit")) e.target.click();
 });
 document.addEventListener("submit", async e=>{ e.preventDefault();
   if(e.target.id==="loginForm"){ doLogin(); return; }
@@ -1569,7 +1622,9 @@ document.addEventListener("input", e=>{
   if(id==="f_ttext"){ const i=document.getElementById("trInfo"); if(i) i.textContent=e.target.value.trim()?`${e.target.value.trim().length.toLocaleString("en-US")} characters`:""; return; }
   const rvp=e.target.dataset&&e.target.dataset.rv; if(rvp&&S.drawer&&S.drawer.rv&&e.target.type!=="checkbox"){ const [k,i,f]=rvp.split("."); S.drawer.rv[k][+i][f]=e.target.value; }
 });
+document.addEventListener("focusout", e=>{ if(e.target.id==="inlineInput") commitInline(false); });
 document.addEventListener("change", async e=>{
+  if(e.target.id==="inlineInput"){ commitInline(false); return; }
   const id=e.target.id, dr=S.drawer;
   if(id==="f_category"){ const c=e.target.value; const q=document.getElementById("quarterWrap"), s=document.getElementById("stageWrap"); if(q) q.hidden=c!==BOARD; if(s) s.hidden=c!==EXTERNAL; return; }
   if(id==="f_tfile" && e.target.files[0]){ try{ const txt=await readTranscriptFile(e.target.files[0]); const ta=document.getElementById("f_ttext"); ta.value=txt; ta.dispatchEvent(new Event("input",{bubbles:true})); toast("Transcript loaded. Check the date, then Read with Claude."); }catch(err){ toast("Couldn't read that file: "+((err&&err.message)||err)); } return; }

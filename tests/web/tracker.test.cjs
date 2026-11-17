@@ -155,7 +155,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("to-do ticked done", t1.done === true && !!t1.doneAt, t1);
 
   // ---- Project editor
-  await p.click('tr[data-id="p3"]'); await p.waitForSelector("#projectForm");
+  await p.click('tr[data-id="p3"] .morebtn'); await p.waitForSelector("#projectForm");
   ok("stage field visible for external", await p.isVisible("#stageWrap"));
   ok("quarter hidden for external", !(await p.isVisible("#quarterWrap")));
   await p.selectOption("#f_category", "Portfolio Growth Initiatives");
@@ -164,7 +164,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   let p3 = await doc(p, "projects", "p3");
   ok("category correction recorded for a Claude category", p3.category === "Portfolio Growth Initiatives" && p3.categoryCorrected === true && p3.categorySuggested === "External Growth Initiatives" && p3.stage === "", p3);
 
-  await p.click('tr[data-id="p4"]'); await p.waitForSelector("#projectForm");
+  await p.click('tr[data-id="p4"] .morebtn'); await p.waitForSelector("#projectForm");
   ok("project to-dos listed in drawer", (await p.$$("#projectForm .todo")).length === 1);
   await p.fill("#pt_text", "Print handouts"); await p.click('[data-act="add-ptodo"]'); await p.waitForTimeout(200);
   ok("to-do added from project drawer", (await docs(p, "todos")).some(t => t.text === "Print handouts" && t.projectId === "p4" && t.owner === ""));
@@ -180,7 +180,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
 
   // conflict: someone else edits the same field while the drawer is open
   await p.goto(BASE + "#projects"); await p.waitForTimeout(300);
-  await p.click('tr[data-id="p1"]'); await p.waitForSelector("#projectForm");
+  await p.click('tr[data-id="p1"] .morebtn'); await p.waitForSelector("#projectForm");
   await p.evaluate(() => window.__mock.otherSave("projects", "p1", { update: "- Their text" }, { notify: false }));
   await p.fill("#f_update", "- My text"); await p.click('.drawer-f [data-act="save-project"]'); await p.waitForTimeout(200);
   ok("conflict panel shown", await p.isVisible(".conflict"));
@@ -386,6 +386,23 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
     if (w === 390) await m.screenshot({ path: path.join(OUT, "week-phone.png"), fullPage: true });
     await m.close();
   }
+  // inline editing on the project table
+  { const pi = await page(b, { hash: "#projects" });
+    await pi.click('tr[data-id="p1"] .cell-edit[data-field="name"]'); await pi.waitForSelector("#inlineInput");
+    await pi.fill("#inlineInput", "Harbor Review 2"); await pi.press("#inlineInput", "Enter"); await pi.waitForTimeout(250);
+    ok("inline rename saves", (await doc(pi, "projects", "p1")).name === "Harbor Review 2");
+    await pi.click('tr[data-id="p3"] .cell-edit[data-field="status"]'); await pi.waitForSelector("select#inlineInput");
+    await pi.selectOption("#inlineInput", "Dropped"); await pi.waitForTimeout(250);
+    const p3d = await doc(pi, "projects", "p3");
+    ok("inline status change sets a closed date", p3d.status === "Dropped" && !!p3d.closedAt, p3d);
+    await pi.click('tr[data-id="p2"] .cell-edit[data-field="update"]'); await pi.waitForSelector("textarea#inlineInput");
+    await pi.fill("#inlineInput", "- Chased the partner"); await pi.click("h2.action-title"); await pi.waitForTimeout(300);
+    const p2u = await doc(pi, "projects", "p2");
+    ok("inline update saves with date and editor name", p2u.update === "- Chased the partner" && p2u.updateDate === dd(0) && p2u.updatedByName === "Zoe Tester", p2u);
+    await pi.click('tr[data-id="p1"] .morebtn'); await pi.waitForSelector("#projectForm");
+    ok("More opens the full editor", await pi.isVisible("#projectForm"));
+    await pi.close(); }
+
   // first login: a one-time password forces the person to set their own
   p = await page(b, { userMeta: { must_reset: true } });
   ok("one-time password gate shown", await p.isVisible("#firstPwForm"));
