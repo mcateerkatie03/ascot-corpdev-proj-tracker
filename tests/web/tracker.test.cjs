@@ -91,37 +91,41 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("last updated flagged after three weeks", !!(await p.$('tr[data-id="p3"] td.lastupd .ago.late')) && (await p.textContent('tr[data-id="p3"] td.lastupd')).includes("5 weeks ago"));
   ok("pending pill", (await p.textContent('tr[data-id="p2"] .pill')).trim() === "Pending");
   ok("deal stage on external project", (await p.textContent('tr[data-id="p3"]')).includes("Deal stage: NDA signed"));
-  const wk = await p.$$eval("section.cols .todo", x => x.map(e => e.dataset.id));
+  const wk = await p.$$eval(".wkside .todo", x => x.map(e => e.dataset.id));
   ok("week to-dos: overdue first, later one left out", wk.join(",") === "t2,t1", wk);
   ok("carried-forward label", (await p.textContent('.todo[data-id="t2"]')).includes("Carried from"));
   ok("overdue marked", !!(await p.$('.todo[data-id="t2"] .due.over')));
   ok("no owner badge on the To-dos tab", (await p.textContent("#tagTodos")) === "");
 
-  // reminders panel beside the table
-  ok("reminders panel beside the table", (await p.$$(".weekgrid .wkside > aside.reminders")).length === 1);
-  ok("reminder shows person and topic", (await p.textContent('.reminders .todo[data-id="r1"]')).includes("B. Sample: Schedule a meeting"));
-  ok("reminders not counted as to-dos", tiles[2] === "3" && !(await p.$('section.cols .todo[data-id="r1"]')));
+  // reminders now open from a header button
+  ok("reminders is a header button", (await p.$$('.headacts [data-act="reminders"]')).length === 1);
+  ok("reminders not counted as to-dos", tiles[2] === "3" && !(await p.$('.wkside .todo[data-id="r1"]')));
   ok("corp dev and stakeholders columns removed", (await p.$$eval("thead th", x => x.map(e => e.textContent).join("|"))) === "Project|Status|Description|This week's update|Last updated");
-  await p.fill("#nr_person", "D. Example"); await p.fill("#nr_text", "Ask about the renewal"); await p.press("#nr_text", "Enter"); await p.waitForTimeout(200);
+  await p.click('.headacts [data-act="reminders"]'); await p.waitForSelector(".drawer .reminders");
+  ok("reminder shows person and topic", (await p.textContent('.drawer .reminders .todo[data-id="r1"]')).includes("B. Sample: Schedule a meeting"));
+  await p.fill("#nr_person", "D. Example"); await p.fill("#nr_text", "Ask about the renewal"); await p.press("#nr_text", "Enter"); await p.waitForTimeout(300);
   const rNew = (await docs(p, "todos")).find(t => t.person === "D. Example");
-  ok("reminder added from the panel", rNew && rNew.kind === "reminder" && rNew.text === "Ask about the renewal" && rNew.owner === "", rNew);
-  await p.click(`.reminders .todo[data-id="${rNew.id}"] .tx`); await p.waitForSelector("#todoForm");
+  ok("reminder added from the drawer", rNew && rNew.kind === "reminder" && rNew.text === "Ask about the renewal" && rNew.owner === "", rNew);
+  await p.click(`.drawer .reminders .todo[data-id="${rNew.id}"] .tx`); await p.waitForSelector("#todoForm");
   ok("reminder opens with the person field", (await p.inputValue("#f_person")) === "D. Example");
   await p.fill("#f_person", "D. Example (Sample Co)"); await p.click('.drawer-f [data-act="save-todo"]'); await p.waitForTimeout(200);
   ok("reminder edited", (await doc(p, "todos", rNew.id)).person === "D. Example (Sample Co)");
-  await p.click(`.reminders .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(800);
-  ok("reminder ticked off leaves the panel", (await doc(p, "todos", rNew.id)).done === true && !(await p.$(`.reminders > ul .todo[data-id="${rNew.id}"]`)));
+  await p.click('.headacts [data-act="reminders"]'); await p.waitForSelector(".drawer .reminders");
+  await p.click(`.drawer .reminders .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(800);
+  ok("reminder ticked off leaves the list", (await doc(p, "todos", rNew.id)).done === true && !(await p.$(`.drawer .reminders > ul .todo[data-id="${rNew.id}"]`)));
   ok("undo offered after ticking", (await p.textContent("#toastRoot")).includes("Followed up with D. Example (Sample Co)") && !!(await p.$('#toastRoot [data-act="toast-undo"]')));
-  await p.click('#toastRoot [data-act="toast-undo"]'); await p.waitForTimeout(250);
-  ok("undo puts it back", (await doc(p, "todos", rNew.id)).done === false && !!(await p.$(`.reminders > ul .todo[data-id="${rNew.id}"]`)));
-  await p.click(`.reminders > ul .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(800);
+  await p.click('#toastRoot [data-act="toast-undo"]'); await p.waitForTimeout(300);
+  ok("undo puts it back", (await doc(p, "todos", rNew.id)).done === false && !!(await p.$(`.drawer .reminders > ul .todo[data-id="${rNew.id}"]`)));
+  await p.click(`.drawer .reminders .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(800);
   ok("done reminders kept under Show done", (await p.textContent(".remdone summary")).includes("Show done (1 this week"));
   await p.click(".remdone summary"); await p.click(`.remdone .todo[data-id="${rNew.id}"] input`); await p.waitForTimeout(400);
   ok("unticking from Show done reopens it", (await doc(p, "todos", rNew.id)).done === false);
+  await p.click('.drawer-f [data-act="close"]'); await p.waitForTimeout(150);
 
   // calendar reminder for a contact
   await p.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; }; });
-  await p.click('.reminders .todo[data-id="r1"] .tx'); await p.waitForSelector("#calBox");
+  await p.click('.headacts [data-act="reminders"]'); await p.waitForSelector(".drawer .reminders");
+  await p.click('.drawer .reminders .todo[data-id="r1"] .tx'); await p.waitForSelector("#calBox");
   ok("calendar box lists contact names only", (await p.$$eval("#cal_to option", o => o.map(x => x.textContent).join("|"))) === "Jane Example|Sam Sample" && !(await p.textContent("#calBox")).includes("@"));
   await p.selectOption("#cal_to", "c2"); const t0 = Date.now(); await p.click('[data-act="cal-open"][data-h="48"]'); await p.waitForTimeout(300);
   const opened = await p.evaluate(() => window.__opened);
@@ -137,7 +141,9 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   const icsText = fs.readFileSync(await ics.path(), "utf8").replace(/\r\n /g, "");   // unfold long lines
   ok("desktop Outlook file has the invitee and alarm", /ATTENDEE;CN=Sam Sample;.*mailto:sam@ascot.test/.test(icsText) && icsText.includes("SUMMARY:Reminder: follow up with B. Sample") && icsText.includes("TRIGGER:-PT15M"), icsText.slice(0, 400));
   await p.click('.drawer-h [data-act="close"]'); await p.waitForTimeout(150);
-  ok("panel shows the calendar reminder", (await p.textContent('.reminders .todo[data-id="r1"] .mailtag')).includes("Sam Sample"));
+  await p.click('.headacts [data-act="reminders"]'); await p.waitForSelector(".drawer .reminders");
+  ok("reminder shows the calendar reminder", (await p.textContent('.drawer .reminders .todo[data-id="r1"] .mailtag')).includes("Sam Sample"));
+  await p.click('.drawer-f [data-act="close"]'); await p.waitForTimeout(150);
   // contacts in settings
   await p.click("#whoDot"); await p.click('#whoMenu [data-act="settings"]'); await p.waitForSelector("#f_contacts");
   ok("settings shows names with emails", (await p.inputValue("#f_contacts")) === "Jane Example (jane@ascot.test)\nSam Sample (sam@ascot.test)");
@@ -341,7 +347,7 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("search", (await p.$$(".dev")).length === 1 && await p.evaluate(() => document.activeElement.id === "dq"));
   // calendar
   await p.goto(BASE + "#week"); await p.waitForTimeout(300);
-  ok("dashboard coming up: next 30 days only", (await p.textContent("section.cols")).includes("Global town hall") && (await p.textContent("section.cols")).includes("Leadership offsite") && !(await p.textContent("section.cols")).includes("Thanksgiving"));
+  ok("dashboard coming up: next 30 days only", (await p.textContent(".wkside")).includes("Global town hall") && (await p.textContent(".wkside")).includes("Leadership offsite") && !(await p.textContent(".wkside")).includes("Thanksgiving"));
   await p.goto(BASE + "#calendar"); await p.waitForTimeout(300);
   const monthOf = d => d.slice(0, 7), calCur = monthOf(dd(0));
   await p.evaluate(m => { S.calMonth = m; render(); }, monthOf(dd(5)));
