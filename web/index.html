@@ -369,9 +369,9 @@ label.chk input{margin-top:3px}
     <nav class="tabs" aria-label="Views" id="tabs" hidden>
       <a href="#week" data-view="week">This week</a>
       <a href="#projects" data-view="projects">Projects</a>
-      <a href="#todos" data-view="todos">To-dos<span class="ntag" id="tagTodos"></span></a>
+      <a href="#todos" data-view="todos">To-Do's<span class="ntag" id="tagTodos"></span></a>
       <a href="#calendar" data-view="calendar">Calendar</a>
-      <a href="#developments" data-view="developments">Key developments</a>
+      <a href="#developments" data-view="developments">Key Developments</a>
       <a href="#meetings" data-view="meetings">Meetings</a>
       <a href="#archive" data-view="archive">Archive</a>
     </nav>
@@ -748,7 +748,7 @@ function renderTodos(){
   const rows=sortTodos(base.filter(F[S.tf]||F.open));
   const chip=(grp,v,label,n,cls)=>`<button type="button" class="fchip${cls||""}" data-act="${grp}" data-v="${esc(v)}" aria-pressed="${S[grp]===v}">${esc(label)}<b>${n}</b></button>`;
   return `
-  <section class="pagehead"><div><h2 class="action-title">To-dos</h2><p class="sub">Action items from the weekly meetings. Unfinished ones carry forward to the next week until they're ticked off.</p></div></section>
+  <section class="pagehead"><div><h2 class="action-title">To-Do's</h2><p class="sub">Action items from the weekly meetings. Unfinished ones carry forward to the next week until they're ticked off.</p></div></section>
   <section class="toolbar"><div class="grow"><input type="search" id="tq" placeholder="Search to-dos" aria-label="Search to-dos" value="${esc(S.tq||"")}"></div><button class="btn" data-act="export-xlsx">Export Excel</button></section>
   <form class="addtodo" id="addTodoForm" aria-label="Add a to-do"><input type="text" id="nt_text" placeholder="Add a to-do" aria-label="To-do"><input type="date" id="nt_due" aria-label="Due date"><button class="btn primary">Add</button></form>
   <div class="frow"><div class="fchips" role="group" aria-label="Filter to-dos">${[["open","Open"],["week","Due this week"],["overdue","Overdue"],["done","Done"],["all","All"]].map(([v,l])=>chip("tf",v,l,base.filter(F[v]).length,v==="overdue"?" late":"")).join("")}</div>
@@ -875,7 +875,7 @@ function renderDevelopments(){
   const groups=[]; for(const d of rows){ const k=devDate(d); const g=groups[groups.length-1]; if(g&&g.k===k) g.list.push(d); else groups.push({k, list:[d]}); }
   const lm=latestMeeting();
   return `
-  <section class="pagehead"><div><h2 class="action-title">Key developments</h2><p class="sub">What came up in the meetings that isn't about a project on the list: industry trends, news about other companies, market moves, regulation. Claude picks these out of each transcript; you can add them by hand too.</p></div>
+  <section class="pagehead"><div><h2 class="action-title">Key Developments</h2><p class="sub">What came up in the meetings that isn't about a project on the list: industry trends, news about other companies, market moves, regulation. Claude picks these out of each transcript; you can add them by hand too.</p></div>
     <div class="headacts"><button class="btn accent" data-act="import-tr">Import transcript</button></div></section>
   <form class="adddev" id="addDevForm" aria-label="Add a key development"><input type="text" id="nd_text" placeholder="Headline, e.g. Casualty rates starting to soften" aria-label="Headline">${sel("nd_topic",DEV_TOPICS,"Industry trends")}<button class="btn primary">Add</button>
     <textarea id="nd_notes" placeholder="Detail (optional): what was said and why it matters" aria-label="Detail"></textarea></form>
