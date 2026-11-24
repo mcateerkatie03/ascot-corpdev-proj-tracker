@@ -168,6 +168,10 @@ footer.foot .wrap{display:flex;justify-content:space-between;gap:12px;padding-bl
 .todo.done .tx b{text-decoration:line-through;color:var(--muted);font-weight:normal}
 .over{color:var(--magenta);font-weight:bold}
 .owner{display:inline-block;font-size:11px;font-weight:bold;background:var(--tile);padding:1px 6px;margin-right:6px;white-space:nowrap}
+.ttag{display:inline-block;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.03em;color:#fff;padding:1px 6px;margin-right:6px;white-space:nowrap;vertical-align:1px}
+.sechead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.addbtn{flex:0 0 auto;width:26px;height:26px;border:1px solid var(--grid);background:var(--ink);color:#fff;font-size:18px;line-height:1;font-weight:bold;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.addbtn:hover{background:var(--magenta)}
 .carry{font-size:11px;color:var(--purple);white-space:nowrap}
 
 /* Tables */
@@ -246,8 +250,10 @@ textarea{resize:vertical;min-height:64px}
 .btn.sm{padding:4px 9px;font-size:12px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.addtodo{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:6px;align-items:start}
-@media (max-width:700px){.addtodo{grid-template-columns:1fr 1fr}.addtodo input:first-child{grid-column:1/-1}}
+.addtodo{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.addtodo input[type=text]{flex:1 1 100%;min-width:0}
+.addtodo select,.addtodo input[type=date]{flex:1 1 120px;min-width:0}
+.addtodo button{flex:0 0 auto;margin-left:auto}
 
 /* Drawer */
 .scrim{position:fixed;inset:0;background:var(--overlay);z-index:40}
@@ -396,12 +402,16 @@ const STATUS_HELP = {Active:"Ongoing",Pending:"No update, or waiting on someone 
 const STAGES = ["Screening","NDA signed","LOI","Diligence","Closed","On hold","Dead"];   // deal stage: External Growth projects only
 const EXTERNAL = "External Growth Initiatives", BOARD = "Quarterly Board Updates";
 const PROJECT_FIELDS = ["name","category","quarter","status","stage","description","stakeholders","corpDev","update","links"];
-const TODO_FIELDS = ["person","text","topic","type","date","endDate","location","owner","projectId","due","done","notes"];
+const TODO_FIELDS = ["person","text","topic","type","date","endDate","location","owner","projectId","due","time","with","done","notes"];
 const FIELD_LABELS = {name:"Project",category:"Category",quarter:"Quarter",status:"Status",stage:"Deal stage",description:"Description",stakeholders:"Stakeholders",corpDev:"Corp Dev",update:"Weekly update",links:"Links",
-  person:"Follow up with",text:"To-do",topic:"Topic",type:"Type",date:"Date",endDate:"End date",location:"Location",owner:"Owner",projectId:"Project",due:"Due",done:"Done",notes:"Notes",closedAt:"Closed",updateDate:"Update date"};
+  person:"Follow up with",text:"Name",topic:"Topic",type:"Type",date:"Date",endDate:"End date",location:"Location",owner:"Owner",projectId:"Project",due:"Date",time:"Time",with:"With",done:"Done",notes:"Description",closedAt:"Closed",updateDate:"Update date"};
 const LONG_FIELDS = ["description","update","notes"];
 const QUIET_DAYS = 21;
 const EVENT_TYPES = ["Town hall", "Strategy day", "Offsite", "Conference", "Board meeting", "Investor event", "Holiday", "Other"];
+const TODO_TYPES = ["Task", "Meeting", "Follow-up", "Deadline"];
+const TYPE_ORDER = {Task:0, Meeting:1, "Follow-up":2, Deadline:3};
+const TYPE_COLOR = {Task:"var(--ink)", Meeting:"var(--lblue)", "Follow-up":"var(--purple)", Deadline:"var(--magenta)"};
+const todoType = t => (t && TODO_TYPES.includes(t.type)) ? t.type : "Task";
 const DEV_TOPICS = ["Industry trends", "Company news", "Market and deals", "Regulation", "Ascot", "Other"];
 const DAY_MS = 86400000;
 const XLSX_SRC = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
@@ -418,7 +428,7 @@ const S = {
   view:"week", sb:null, db:null, meId:null, session:null, authChecked:false, started:false, channel:null, loginErr:"", loginBusy:false,
   projects:[], todos:[], reminders:[], developments:[], events:[], meetings:[], loaded:{projects:false,todos:false,meetings:false}, stale:false, configMissing:false,
   profiles:{}, settings:{}, hist:{}, changes:null,
-  q:"", pf:"open", pcat:"all", ppl:"all", tf:"open", tpl:"all", aq:"", dq:"", dtopic:"all", calMonth:"", etype:"all", drawer:null, inlineEdit:null
+  q:"", pf:"open", pcat:"all", ppl:"all", tf:"open", tpl:"all", ttype:"all", aq:"", dq:"", dtopic:"all", calMonth:"", etype:"all", drawer:null, inlineEdit:null
 };
 
 /* ---------- helpers ---------- */
@@ -428,9 +438,11 @@ function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","
 function fmtDate(s){ if(!s) return ""; const d=new Date(s+"T00:00:00"); if(isNaN(d)) return esc(s);
   return d.toLocaleDateString("en-GB",{day:"numeric",month:"short", ...(d.getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{})}); }
 function fmtWhen(ms){ if(!ms) return ""; const d=new Date(ms); return d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})+" "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}); }
+function fmtTime(s){ const m=String(s||"").match(/^(\d{1,2}):(\d{2})/); if(!m) return ""; let h=+m[1]; const ap=h<12?"am":"pm"; h=h%12||12; return h+":"+m[2]+ap; }
 function fmtAgo(ms){ if(!ms) return ""; const m=Math.round((Date.now()-ms)/60000); if(m<1) return "just now"; if(m<60) return `${m} min ago`; const h=Math.round(m/60); if(h<24) return `${h} h ago`; return fmtWhen(ms); }
 function daysUntil(s){ if(!s) return null; return Math.round((new Date(s+"T00:00:00") - new Date(TODAY()+"T00:00:00"))/DAY_MS); }
 function addDays(s,n){ const d=new Date(s+"T00:00:00"); d.setDate(d.getDate()+n); return iso(d); }
+function weekMonday(){ const d=new Date(TODAY()+"T00:00:00"); d.setDate(d.getDate()-((d.getDay()+6)%7)); return iso(d); }
 function safeUrl(u){ try{ const x=new URL(String(u).trim()); return (x.protocol==="https:"||x.protocol==="http:") ? x.href : null; }catch{ return null; } }
 function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
 function toast(msg, undo){ const r=document.getElementById("toastRoot"); toast.undo=undo||null; r.innerHTML=`<div class="toast" role="status">${esc(msg)}${undo?`<button type="button" class="undo" data-act="toast-undo">Undo</button>`:""}</div>`; clearTimeout(toast.t); toast.t=setTimeout(()=>{ r.innerHTML=""; toast.undo=null; }, undo?7000:3600); }
@@ -460,7 +472,7 @@ function projTags(p){
   return t;
 }
 function todoOverdue(t){ const n=daysUntil(t.due); return !t.done && n!=null && n<0; }
-function sortTodos(list){ return list.sort((a,b)=>(a.done-b.done) || String(a.due||"9999").localeCompare(String(b.due||"9999")) || String(a.owner||"").localeCompare(String(b.owner||"")) || (a.createdAt||0)-(b.createdAt||0)); }
+function sortTodos(list){ return list.sort((a,b)=>(a.done-b.done) || (TYPE_ORDER[todoType(a)]-TYPE_ORDER[todoType(b)]) || String(a.due||"9999").localeCompare(String(b.due||"9999")) || String(a.owner||"").localeCompare(String(b.owner||"")) || (a.createdAt||0)-(b.createdAt||0)); }
 
 /* ---------- routing ---------- */
 const VIEWS = ["week","projects","todos","archive","developments","calendar","meetings"];
@@ -523,7 +535,7 @@ function renderWeek(){
   const later = openTodos.length - due.length;
   const openRem = S.reminders.filter(r=>!r.done).length;
   return `
-  <section class="pagehead"><div><h2 class="action-title">${lm?`Week of ${esc(fmtDate(lm.date))}`:"This week"}</h2>
+  <section class="pagehead"><div><h2 class="action-title">Week of ${esc(fmtDate(weekMonday()))}</h2>
     <p class="sub">${lm?`From the meeting on ${esc(fmtDate(lm.date))}${lm.summary?`: ${esc(lm.summary)}`:"."}`:"Import a meeting transcript to fill in this week's updates and to-dos."}</p></div>
     <div class="headacts"><button class="btn accent" data-act="import-tr">Meeting &#8594; Copilot</button><button class="btn primary" data-act="new-project">Add project</button><button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn" data-act="export-pdf">Export PDF</button><button class="btn" data-act="print">Print</button><button class="btn" data-act="reminders">Reminders${openRem?` (${openRem})`:""}</button></div></section>
   <section class="tiles" aria-label="Headline numbers">
@@ -534,7 +546,8 @@ function renderWeek(){
   </section>
   <div class="weekgrid"><div>${S.projects.length ? projectTableHTML(open, {grouped:true}) : emptyStart()}</div>
     <div class="wkside">
-      <section><h3 class="sec">To-dos for the week <span class="n">${due.length}</span></h3>${todoListHTML(due, {showProject:true})}${later?`<p class="t2" style="margin-top:6px"><a href="#todos">${later} more due later</a></p>`:""}</section>
+      <section><div class="sechead"><h3 class="sec">To-dos for the week <span class="n">${due.length}</span></h3><button class="addbtn" data-act="add-todo-open" title="Add a to-do, meeting or deadline" aria-label="Add a to-do">+</button></div>${todoListHTML(due, {showProject:true, showWith:true})}${later?`<p class="t2" style="margin-top:6px"><a href="#todos">${later} more due later</a></p>`:""}
+        <p class="t2" style="margin-top:4px">Click the + to add, a to-do to edit it, or tick it off when it's done.</p></section>
       <section><h3 class="sec">Coming up <span class="n">next 30 days</span></h3>${comingUpHTML()}</section>
       <section><h3 class="sec">What changed</h3>${changesHTML()}</section>
     </div></div>
@@ -737,9 +750,15 @@ function todoListHTML(list, {showProject, showMeeting}={}){
   const lm=latestMeeting();
   return `<ul class="todos">${list.map(t=>{ const p=t.projectId&&projById(t.projectId); const od=todoOverdue(t); const n=daysUntil(t.due);
     const carried = !t.done && lm && t.meetingDate && t.meetingDate<lm.date;
+    const parts=[];
+    if(!t.kind && (t.time||t.with)) parts.push(esc([t.time?fmtTime(t.time):"", t.with?"with "+t.with:""].filter(Boolean).join(" · ")));
+    if(showProject&&p) parts.push(esc(p.name)); else if(showProject&&t.projectId) parts.push("A removed project");
+    if(carried) parts.push(`<span class="carry">Carried from ${esc(fmtDate(t.meetingDate))}</span>`);
+    else if(showMeeting&&t.meetingDate) parts.push(`from ${esc(fmtDate(t.meetingDate))}`);
+    if(t.done&&t.doneAt) parts.push(`done ${esc(fmtDate(t.doneAt))}`);
     return `<li class="todo${t.done?" done":""}" data-id="${esc(t.id)}"><input type="checkbox" data-act="todo-done" data-id="${esc(t.id)}" ${t.done?"checked":""} aria-label="Done: ${esc(t.text)}">
-      <div class="tx" data-act="open-todo" data-id="${esc(t.id)}" tabindex="0"><b>${t.owner?`<span class="owner">${esc(t.owner)}</span>`:""}${esc(t.text)}</b>
-        <div class="meta">${showProject&&p?esc(p.name):showProject&&t.projectId?"A removed project":""}${carried?`${showProject&&t.projectId?" · ":""}<span class="carry">Carried from ${esc(fmtDate(t.meetingDate))}</span>`:""}${showMeeting&&t.meetingDate&&!carried?` · from ${esc(fmtDate(t.meetingDate))}`:""}${t.done&&t.doneAt?` · done ${esc(fmtDate(t.doneAt))}`:""}</div></div>
+      <div class="tx" data-act="open-todo" data-id="${esc(t.id)}" tabindex="0"><b>${t.kind?"":`<span class="ttag" style="background:${TYPE_COLOR[todoType(t)]}">${esc(todoType(t))}</span>`}${t.owner?`<span class="owner">${esc(t.owner)}</span>`:""}${esc(t.text)}</b>
+        <div class="meta">${parts.join(" · ")}</div></div>
       <div class="due${od?" over":""}">${t.due?(od?"Overdue: ":n===0?"Today: ":"")+esc(fmtDate(t.due)):'<span class="t2">No date</span>'}</div></li>`; }).join("")}</ul>`;
 }
 function renderTodos(){
@@ -748,13 +767,15 @@ function renderTodos(){
   const F={open:t=>!t.done, mine:t=>!t.done&&!!me&&initialsList(t.owner).includes(me), overdue:todoOverdue, week:t=>!t.done&&(!t.due||t.due<=addDays(TODAY(),7)), done:t=>t.done, all:()=>true};
   const byPerson=t=>S.tpl==="all"||initialsList(t.owner).includes(S.tpl)||String(t.owner||"").toUpperCase()===S.tpl;
   const q=(S.tq||"").trim().toLowerCase(); const base=S.todos.filter(t=>!q||[t.text,t.owner,t.notes,(projById(t.projectId)||{}).name].join(" ").toLowerCase().includes(q));
-  const rows=sortTodos(base.filter(F[S.tf]||F.open));
+  const byType=t=>S.ttype==="all"||!S.ttype||todoType(t)===S.ttype;
+  const rows=sortTodos(base.filter(F[S.tf]||F.open).filter(byType));
   const chip=(grp,v,label,n,cls)=>`<button type="button" class="fchip${cls||""}" data-act="${grp}" data-v="${esc(v)}" aria-pressed="${S[grp]===v}">${esc(label)}<b>${n}</b></button>`;
   return `
   <section class="pagehead"><div><h2 class="action-title">To-Do's</h2><p class="sub">Action items from the weekly meetings. Unfinished ones carry forward to the next week until they're ticked off.</p></div></section>
   <section class="toolbar"><div class="grow"><input type="search" id="tq" placeholder="Search to-dos" aria-label="Search to-dos" value="${esc(S.tq||"")}"></div><button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn" data-act="export-pdf">Export PDF</button></section>
-  <form class="addtodo" id="addTodoForm" aria-label="Add a to-do"><input type="text" id="nt_text" placeholder="Add a to-do" aria-label="To-do"><input type="date" id="nt_due" aria-label="Due date"><button class="btn primary">Add</button></form>
+  <form class="addtodo" id="addTodoForm" aria-label="Add a to-do"><input type="text" id="nt_text" placeholder="Add a to-do" aria-label="To-do"><select id="nt_type" aria-label="Type">${TODO_TYPES.map(x=>`<option value="${x}">${x}</option>`).join("")}</select><input type="date" id="nt_due" aria-label="Due date"><button class="btn primary">Add</button></form>
   <div class="frow"><div class="fchips" role="group" aria-label="Filter to-dos">${[["open","Open"],["week","Due this week"],["overdue","Overdue"],["done","Done"],["all","All"]].map(([v,l])=>chip("tf",v,l,base.filter(F[v]).length,v==="overdue"?" late":"")).join("")}</div>
+    <div class="fchips" role="group" aria-label="Filter by type">${chip("ttype","all","All types",base.filter(F[S.tf]||F.open).length)}${TODO_TYPES.map(ty=>chip("ttype",ty,ty,base.filter(F[S.tf]||F.open).filter(t=>todoType(t)===ty).length)).join("")}</div>
   </div>
   <section>${todoListHTML(rows,{showProject:true,showMeeting:true})}</section>
   <p class="source">${rows.length} to-do${rows.length===1?"":"s"} shown.</p>`;
@@ -1021,12 +1042,15 @@ function todoFormHTML(dr){
     <div id="drAlert" role="alert"></div>
     <div class="fgrid">
       ${rem?`<label class="f full">Follow up with<input type="text" id="f_person" value="${esc(t.person||"")}"></label>`:""}
-      <label class="f full">${rem?"About":"To-do"}<input type="text" id="f_text" value="${esc(t.text||"")}"></label>
-      ${rem?"":`<label class="f">Owner <em>(initials)</em><input type="text" id="f_owner" value="${esc(t.owner||"")}" list="ownerList2"><datalist id="ownerList2">${teamInitials().map(i=>`<option value="${esc(i)}">`).join("")}</datalist></label>`}
-      <label class="f">Due<input type="date" id="f_due" value="${esc(t.due||"")}"></label>
-      <label class="f full">Project${sel("f_projectId",projs.map(p=>[p.id,p.name+(isOpen(p)?"":` (${p.status})`)]),t.projectId||"","No project")}</label>
+      ${rem?"":`<label class="f full">Type${sel("f_type",TODO_TYPES,todoType(t))}</label>`}
+      <label class="f full">${rem?"About":"Name"}<input type="text" id="f_text" value="${esc(t.text||"")}"></label>
+      ${rem?"":`<label class="f full">Description <em>(optional)</em><textarea id="f_notes" rows="2">${esc(t.notes||"")}</textarea></label>`}
+      <label class="f">Date<input type="date" id="f_due" value="${esc(t.due||"")}"></label>
+      ${rem?"":`<label class="f">Time <em>(optional)</em><input type="time" id="f_time" value="${esc(t.time||"")}"></label>`}
+      ${rem?"":`<label class="f full">Who it's with <em>(optional)</em><input type="text" id="f_with" value="${esc(t.with||"")}" placeholder="Names"></label>`}
+      <label class="f full"><b>Related project</b>${sel("f_projectId",projs.map(p=>[p.id,p.name+(isOpen(p)?"":` (${p.status})`)]),t.projectId||"","No project")}</label>
       <label class="chk full"><input type="checkbox" id="f_done"${t.done?" checked":""}> Done</label>
-      <label class="f full">Notes<textarea id="f_notes" rows="3">${esc(t.notes||"")}</textarea></label>
+      ${rem?`<label class="f full">Notes<textarea id="f_notes" rows="3">${esc(t.notes||"")}</textarea></label>`:""}
     </div>
     ${rem&&!isNew?`<div id="calBox">${calendarBoxHTML(dr.id)}</div>`:""}
     ${t.quote?`<p class="source">From the transcript: "${esc(t.quote)}"</p>`:""}
@@ -1038,7 +1062,11 @@ function todoFormHTML(dr){
 }
 function todoFormValues(){ if(document.getElementById("f_etype")){ const d=val("f_date"), e=val("f_endDate"); return {text:val("f_text"), type:val("f_etype"), date:d, endDate:e&&e>d?e:"", location:val("f_location"), notes:val("f_notes")}; }
   if(document.getElementById("f_topic")) return {text:val("f_text"), topic:val("f_topic"), notes:val("f_notes")};
-  return {...(document.getElementById("f_person")?{person:val("f_person")}:{}), text:val("f_text"), owner:val("f_owner").toUpperCase(), due:val("f_due"), projectId:val("f_projectId"), done:!!document.getElementById("f_done")?.checked, notes:val("f_notes")}; }
+  return {...(document.getElementById("f_person")?{person:val("f_person")}:{}), text:val("f_text"),
+    ...(document.getElementById("f_type")?{type:val("f_type")||"Task"}:{}),
+    ...(document.getElementById("f_owner")?{owner:val("f_owner").toUpperCase()}:{}),
+    due:val("f_due"), ...(document.getElementById("f_time")?{time:val("f_time")}:{}), ...(document.getElementById("f_with")?{with:val("f_with")}:{}),
+    projectId:val("f_projectId"), done:!!document.getElementById("f_done")?.checked, notes:val("f_notes")}; }
 
 /* Meeting snapshot */
 function meetingHTML(dr){
@@ -1240,10 +1268,10 @@ async function toggleTodo(id, done){
   if(ok){ if(done) toast(rem?`Followed up with ${row.person||"them"}`:"Done", ()=>toggleTodo(id,false)); else toast(rem?"Back on the reminders list":"Reopened"); }
   if(S.drawer && S.drawer.kind==="project"){ S.drawer.rendered=false; captureForm(); renderDrawer(); restoreForm(); }
 }
-async function addTodo({text, owner, due, projectId}){
+async function addTodo({text, owner, due, projectId, type}){
   text=String(text||"").trim(); if(!text){ toast("Write the to-do first."); return false; }
   const lm=latestMeeting();
-  return guard(()=>S.db.collection("todos").doc("t"+uid()).set({text, owner:String(owner||"").trim().toUpperCase(), due:due||"", projectId:projectId||"", done:false, notes:"",
+  return guard(()=>S.db.collection("todos").doc("t"+uid()).set({text, type:TODO_TYPES.includes(type)?type:"Task", owner:String(owner||"").trim().toUpperCase(), due:due||"", projectId:projectId||"", done:false, notes:"",
     meetingId:"", meetingDate:lm&&lm.date>=addDays(TODAY(),-7)?lm.date:"", createdAt:Date.now(), createdBy:S.meId||"", ...meta()}), "To-do added");
 }
 async function addReminder({person, text, owner, projectId}){
@@ -1434,6 +1462,7 @@ async function importWorkbook(){
 
 /* ---------- PDF export: the open project list, grouped by category, in Ascot house style ---------- */
 const STATUS_PDF = { Active:"#EB008C", Pending:"#262166", Completed:"#00857C", Dropped:"#666666" };
+const TYPE_PDF = { Task:"#262166", Meeting:"#0081C3", "Follow-up":"#944599", Deadline:"#EB008C" };
 const STRIPE = ["#262166","#944599","#EB008C","#0081C3","#00539E","#00857C"];
 async function exportPDF(){
   if(!S.projects.length){ toast("No projects to export yet."); return; }
@@ -1484,12 +1513,17 @@ async function exportPDF(){
   if(dueTodos.length){
     let y=(doc.lastAutoTable?doc.lastAutoTable.finalY:78)+24;
     if(y>H-90){ doc.addPage(); y=40; }
-    doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor("#262166"); doc.text("To-dos for the week", M, y);
+    doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor("#262166"); doc.text("To-dos, meetings and deadlines this week", M, y);
     doc.autoTable({ startY:y+8, margin:{ left:M, right:M, top:24, bottom:36 },
-      head:[["To-do","Project","Due"]],
-      body:dueTodos.map(t=>[t.text||"", (projById(t.projectId)||{}).name||"", t.due?fmtDate(t.due):"No date"]),
+      head:[["Type","Item","Project","When"]],
+      body:dueTodos.map(t=>[
+        { content:todoType(t), styles:{ textColor:TYPE_PDF[todoType(t)]||"#262166", fontStyle:"bold" } },
+        (t.text||"") + (t.with?`\nWith: ${t.with}`:""),
+        (projById(t.projectId)||{}).name||"",
+        (t.due?fmtDate(t.due):"No date") + (t.time?`\n${fmtTime(t.time)}`:"")
+      ]),
       styles:baseStyles, headStyles, alternateRowStyles:{ fillColor:"#F7F7FB" },
-      columnStyles:{ 0:{cellWidth:"auto"}, 1:{cellWidth:200}, 2:{cellWidth:90} },
+      columnStyles:{ 0:{cellWidth:66}, 1:{cellWidth:"auto"}, 2:{cellWidth:180}, 3:{cellWidth:96} },
       didDrawPage:decorate });
   }
   doc.save(`Corp_Dev_Projects_${today}.pdf`);
@@ -1544,13 +1578,14 @@ document.addEventListener("click", async e=>{
     case "ev-ics": { const e=S.events.find(x=>x.id===id); if(e) eventIcs({...e, text:val("f_text")||e.text, date:val("f_date")||e.date, endDate:val("f_endDate"), location:val("f_location"), notes:val("f_notes")}); break; }
     case "cal-open": await openCalendar(id, +t.dataset.h, "outlook"); break;
     case "cal-ics": await openCalendar(id, +t.dataset.h, "ics"); break;
-    case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "af": case "acat": case "dtopic": case "etype": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
+    case "pf": case "pcat": case "ppl": case "tf": case "tpl": case "ttype": case "af": case "acat": case "dtopic": case "etype": S[a]=t.dataset.v; render(); document.querySelector(`.fchip[data-act="${a}"][data-v="${CSS.escape(t.dataset.v)}"]`)?.focus(); break;
     case "inline": startInline(id, t.dataset.field); break;
     case "open-project": goRecord("project",id); break;
     case "open-project-snap": if(id&&projById(id)){ S.drawer=null; goRecord("project",id); } break;
     case "open-todo": goRecord("todo",id); break;
     case "open-meeting": goRecord("meeting",id); break;
     case "new-project": S.drawer={kind:"project",id:null,links:[]}; renderDrawer(); break;
+    case "add-todo-open": S.drawer={kind:"todo",id:null,seed:{type:"Task"}}; renderDrawer(); break;
     case "save-project": t.disabled=true; await saveRecord("project"); t.disabled=false; break;
     case "save-todo": t.disabled=true; await saveRecord("todo"); t.disabled=false; break;
     case "todo-done": await toggleTodo(id, t.checked); break;
@@ -1602,7 +1637,7 @@ document.addEventListener("submit", async e=>{ e.preventDefault();
   if(e.target.id==="addEvForm"){ if(await addEvent({text:val("ne_text"), type:val("ne_type"), date:val("ne_date"), endDate:val("ne_end")})){ ["ne_text","ne_date","ne_end"].forEach(i=>{ const x=document.getElementById(i); if(x) x.value=""; }); } return; }
   if(e.target.id==="addDevForm"){ if(await addDevelopment({text:val("nd_text"), topic:val("nd_topic"), notes:val("nd_notes")})){ ["nd_text","nd_notes"].forEach(i=>{ const x=document.getElementById(i); if(x) x.value=""; }); document.getElementById("nd_text")?.focus(); } return; }
   if(e.target.id==="addRemForm"){ if(await addReminder({person:val("nr_person"), text:val("nr_text"), owner:""})){ const x=document.getElementById("nr_person"); if(x){ x.value=""; x.focus(); } } return; }
-  if(e.target.id==="addTodoForm"){ if(await addTodo({text:val("nt_text"), owner:"", due:val("nt_due")})){ const x=document.getElementById("nt_text"); if(x){ x.value=""; x.focus(); } } }
+  if(e.target.id==="addTodoForm"){ if(await addTodo({text:val("nt_text"), owner:"", due:val("nt_due"), type:val("nt_type")})){ const x=document.getElementById("nt_text"); if(x){ x.value=""; x.focus(); } } }
 });
 document.addEventListener("input", e=>{
   const id=e.target.id;

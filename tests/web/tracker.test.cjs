@@ -262,8 +262,11 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   await p.fill("#nt_text", "New sample task"); await p.press("#nt_text", "Enter"); await p.waitForTimeout(200);
   ok("add to-do from the to-dos page", (await docs(p, "todos")).some(t => t.text === "New sample task" && t.owner === ""));
   await p.click('.fchip[data-act="tf"][data-v="open"]'); await p.click('.todo[data-id="t2"] .tx'); await p.waitForSelector("#todoForm");
-  await p.fill("#f_owner", "zt"); await p.click('.drawer-f [data-act="save-todo"]'); await p.waitForTimeout(200);
-  ok("owner saved upper-case", (await doc(p, "todos", "t2")).owner === "ZT");
+  await p.selectOption("#f_type", "Meeting"); await p.fill("#f_time", "14:30"); await p.fill("#f_with", "Will Lane"); await p.click('.drawer-f [data-act="save-todo"]'); await p.waitForTimeout(200);
+  { const d = await doc(p, "todos", "t2"); ok("to-do type, time and with saved", d.type === "Meeting" && d.time === "14:30" && d.with === "Will Lane"); }
+  await p.click('.fchip[data-act="ttype"][data-v="Meeting"]'); await p.waitForTimeout(150);
+  ok("type filter shows only meetings", (await p.$$eval(".todo .ttag", x => x.map(e => e.textContent.trim().toLowerCase()))).every(v => v === "meeting"));
+  await p.click('.fchip[data-act="ttype"][data-v="all"]'); await p.waitForTimeout(150);
   await p.goto(BASE + "#meetings"); await p.waitForTimeout(200);
   await p.click(".mlist li.click"); await p.waitForSelector(".drawer.wide");
   ok("meeting drawer shows snapshot", (await p.textContent(".drawer")).includes("Harbor Review"));
