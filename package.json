@@ -8,7 +8,9 @@
     "test": "node tests/run.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.117.2"
+    "@supabase/supabase-js": "2.117.2",
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.8.2"
   },
   "devDependencies": {
     "jszip": "3.10.1",

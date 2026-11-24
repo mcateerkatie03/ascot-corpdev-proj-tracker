@@ -407,6 +407,8 @@ const DAY_MS = 86400000;
 const XLSX_SRC = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
 const JSZIP_SRC = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
 const COPILOT_URL = "https://m365.cloud.microsoft/chat";
+const JSPDF_SRC = "https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js";
+const AUTOTABLE_SRC = "https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js";
 
 /* ---------- state ---------- */
 const CFG = Object.assign({}, window.TRACKER_CONFIG || {});
@@ -523,7 +525,7 @@ function renderWeek(){
   return `
   <section class="pagehead"><div><h2 class="action-title">${lm?`Week of ${esc(fmtDate(lm.date))}`:"This week"}</h2>
     <p class="sub">${lm?`From the meeting on ${esc(fmtDate(lm.date))}${lm.summary?`: ${esc(lm.summary)}`:"."}`:"Import a meeting transcript to fill in this week's updates and to-dos."}</p></div>
-    <div class="headacts"><button class="btn accent" data-act="import-tr">Meeting &#8594; Copilot</button><button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn" data-act="print">Print</button><button class="btn" data-act="reminders">Reminders${openRem?` (${openRem})`:""}</button></div></section>
+    <div class="headacts"><button class="btn accent" data-act="import-tr">Meeting &#8594; Copilot</button><button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn" data-act="export-pdf">Export PDF</button><button class="btn" data-act="print">Print</button><button class="btn" data-act="reminders">Reminders${openRem?` (${openRem})`:""}</button></div></section>
   <section class="tiles" aria-label="Headline numbers">
     <div class="tile"><b class="c-mag">${act.length}</b><span>Active projects</span><small>${open.length} on the list</small></div>
     <div class="tile"><b class="c-navy">${pend.length}</b><span>Pending</span><small>No update, or waiting on others</small></div>
@@ -724,7 +726,7 @@ function renderProjects(){
   return `
   <section class="pagehead"><div><h2 class="action-title">Projects</h2><p class="sub">Everything on the list, grouped by category. Click a status, name, description or update to edit it in place; use <b>More</b> for the full project. Changes save straight away.</p></div></section>
   <section class="toolbar"><div class="grow"><input type="search" id="q" placeholder="Search projects, descriptions and updates" aria-label="Search projects" value="${esc(S.q)}"></div>
-    <button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn primary" data-act="new-project">New project</button></section>
+    <button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn" data-act="export-pdf">Export PDF</button><button class="btn primary" data-act="new-project">New project</button></section>
   ${S.projects.length?projectFilterChips(base)+projectTableHTML(rows,{grouped:true}):emptyStart()}
   <p class="source">${rows.length} project${rows.length===1?"":"s"} shown. Completed and dropped projects are in the Archive.</p>`;
 }
@@ -750,7 +752,7 @@ function renderTodos(){
   const chip=(grp,v,label,n,cls)=>`<button type="button" class="fchip${cls||""}" data-act="${grp}" data-v="${esc(v)}" aria-pressed="${S[grp]===v}">${esc(label)}<b>${n}</b></button>`;
   return `
   <section class="pagehead"><div><h2 class="action-title">To-Do's</h2><p class="sub">Action items from the weekly meetings. Unfinished ones carry forward to the next week until they're ticked off.</p></div></section>
-  <section class="toolbar"><div class="grow"><input type="search" id="tq" placeholder="Search to-dos" aria-label="Search to-dos" value="${esc(S.tq||"")}"></div><button class="btn" data-act="export-xlsx">Export Excel</button></section>
+  <section class="toolbar"><div class="grow"><input type="search" id="tq" placeholder="Search to-dos" aria-label="Search to-dos" value="${esc(S.tq||"")}"></div><button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn" data-act="export-pdf">Export PDF</button></section>
   <form class="addtodo" id="addTodoForm" aria-label="Add a to-do"><input type="text" id="nt_text" placeholder="Add a to-do" aria-label="To-do"><input type="date" id="nt_due" aria-label="Due date"><button class="btn primary">Add</button></form>
   <div class="frow"><div class="fchips" role="group" aria-label="Filter to-dos">${[["open","Open"],["week","Due this week"],["overdue","Overdue"],["done","Done"],["all","All"]].map(([v,l])=>chip("tf",v,l,base.filter(F[v]).length,v==="overdue"?" late":"")).join("")}</div>
   </div>
@@ -1430,6 +1432,69 @@ async function importWorkbook(){
   if(ok){ toast(`Imported ${n} project${n===1?"":"s"} and ${p.meetings.length} weekly snapshot${p.meetings.length===1?"":"s"}`); S.changes=null; closeDrawer(); }
 }
 
+/* ---------- PDF export: the open project list, grouped by category, in Ascot house style ---------- */
+const STATUS_PDF = { Active:"#EB008C", Pending:"#262166", Completed:"#00857C", Dropped:"#666666" };
+const STRIPE = ["#262166","#944599","#EB008C","#0081C3","#00539E","#00857C"];
+async function exportPDF(){
+  if(!S.projects.length){ toast("No projects to export yet."); return; }
+  toast("Building the PDF\u2026");
+  await loadScript(JSPDF_SRC,"PDF"); await loadScript(AUTOTABLE_SRC,"PDF");
+  const JsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+  const doc = new JsPDF({ orientation:"landscape", unit:"pt", format:"a4" });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 32;
+  const today = TODAY(), sw = W/STRIPE.length;
+  const open=S.projects.filter(isOpen);
+  const upds=S.projects.map(p=>p.updateDate).filter(Boolean).sort();
+  const lastUpd = upds.length ? upds[upds.length-1] : (latestMeeting()?latestMeeting().date:"");
+  let titleDone=false;
+  const decorate=(d)=>{
+    STRIPE.forEach((col,i)=>{ doc.setFillColor(col); doc.rect(i*sw,0,sw,6,"F"); });
+    if(d.pageNumber===1 && !titleDone){ titleDone=true;
+      doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor("#262166"); doc.text("CORPORATE DEVELOPMENT", M, 30);
+      doc.setFont("helvetica","normal"); doc.setFontSize(18); doc.setTextColor("#EB008C"); doc.text("Weekly project tracker", M, 50);
+      doc.setFontSize(9.5); doc.setTextColor("#666666");
+      doc.text(`Exported ${fmtDate(today)}   \u00b7   Table last updated ${lastUpd?fmtDate(lastUpd):"n/d"}   \u00b7   ${open.length} project${open.length===1?"":"s"}`, M, 66);
+    }
+    doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor("#666666");
+    doc.text("Confidential: corporate development use only", M, H-18);
+    doc.text(`Page ${d.pageNumber} of ${doc.internal.getNumberOfPages()}`, W-M, H-18, { align:"right" });
+  };
+  const baseStyles={ font:"helvetica", fontSize:8, cellPadding:4, overflow:"linebreak", valign:"top", lineColor:"#D9DCE6", lineWidth:0.5, textColor:"#262166" };
+  const headStyles={ fillColor:"#262166", textColor:"#FFFFFF", fontSize:8, lineColor:"#262166" };
+  const cats=[...CATEGORIES, NO_CAT]; const body=[];
+  for(const c of cats){
+    const g=open.filter(p=>catOf(p)===c).sort((a,b)=>(a.order??1e9)-(b.order??1e9)||String(a.name).localeCompare(String(b.name)));
+    if(!g.length && c===NO_CAT) continue;
+    body.push([{ content:`${c}  (${g.length})`, colSpan:5, styles:{ fillColor:"#EEEEF5", textColor:"#262166", fontStyle:"bold", lineColor:"#262166" } }]);
+    if(!g.length){ body.push([{ content:"None at the moment.", colSpan:5, styles:{ textColor:"#666666" } }]); continue; }
+    for(const p of g){ body.push([
+      { content:(p.name||"")+(p.quarter?`  (${p.quarter})`:"")+(p.stage&&catOf(p)===EXTERNAL?`\nDeal stage: ${p.stage}`:""), styles:{ fontStyle:"bold" } },
+      { content:p.status||"Active", styles:{ textColor:STATUS_PDF[p.status]||"#00539E", fontStyle:"bold" } },
+      p.description||"",
+      p.update||"",
+      (p.updateDate?fmtDate(p.updateDate):"n/d")+"\nby "+updaterName(p)
+    ]); }
+  }
+  doc.autoTable({ startY:78, margin:{ left:M, right:M, top:24, bottom:36 },
+    head:[["Project","Status","Description","This week's update","Last updated"]], body,
+    styles:baseStyles, headStyles, alternateRowStyles:{ fillColor:"#F7F7FB" },
+    columnStyles:{ 0:{cellWidth:150}, 1:{cellWidth:60}, 2:{cellWidth:168}, 3:{cellWidth:"auto"}, 4:{cellWidth:88} },
+    didDrawPage:decorate });
+  const dueTodos=sortTodos(S.todos.filter(t=>!t.done && (!t.due || t.due<=addDays(today,7))));
+  if(dueTodos.length){
+    let y=(doc.lastAutoTable?doc.lastAutoTable.finalY:78)+24;
+    if(y>H-90){ doc.addPage(); y=40; }
+    doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor("#262166"); doc.text("To-dos for the week", M, y);
+    doc.autoTable({ startY:y+8, margin:{ left:M, right:M, top:24, bottom:36 },
+      head:[["To-do","Project","Due"]],
+      body:dueTodos.map(t=>[t.text||"", (projById(t.projectId)||{}).name||"", t.due?fmtDate(t.due):"No date"]),
+      styles:baseStyles, headStyles, alternateRowStyles:{ fillColor:"#F7F7FB" },
+      columnStyles:{ 0:{cellWidth:"auto"}, 1:{cellWidth:200}, 2:{cellWidth:90} },
+      didDrawPage:decorate });
+  }
+  doc.save(`Corp_Dev_Projects_${today}.pdf`);
+}
+
 /* ---------- Excel export: same layout as the workbook ---------- */
 async function exportWorkbook(){
   toast("Building the workbook…");
@@ -1511,6 +1576,7 @@ document.addEventListener("click", async e=>{
     case "snap-save": { const d=val("f_sdate"); if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ toast("Choose the meeting date."); return; } t.disabled=true;
       if(await guard(()=>saveMeeting(d,{summary:val("f_ssum"), source:"manual"}).then(()=>refetch("meetings")), "Snapshot saved")) closeDrawer(); else t.disabled=false; break; }
     case "export-xlsx": t.disabled=true; try{ await exportWorkbook(); }catch(err){ toast("Couldn't build the workbook: "+((err&&err.message)||"unknown error")); } t.disabled=false; break;
+    case "export-pdf": t.disabled=true; try{ await exportPDF(); }catch(err){ toast("Couldn't build the PDF: "+((err&&err.message)||"unknown error")); } t.disabled=false; break;
     case "print": window.print(); break;
   }
 });

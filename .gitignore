@@ -16,3 +16,4 @@ tests/out/
 *.xlsx
 *.docx
 *.vtt
+test-results/

@@ -6,7 +6,7 @@ const XLSX = require("xlsx"), JSZip = require("jszip");
 const OUT = path.join(__dirname, "../out"); fs.mkdirSync(OUT, { recursive: true });
 const WEB = path.join(__dirname, "../../web");
 const MOCK = fs.readFileSync(__dirname + "/mock-supabase.js", "utf8");
-const LIBS = { xlsx: fs.readFileSync(require.resolve("xlsx/dist/xlsx.full.min.js"), "utf8"), jszip: fs.readFileSync(require.resolve("jszip/dist/jszip.min.js"), "utf8") };
+const LIBS = { xlsx: fs.readFileSync(require.resolve("xlsx/dist/xlsx.full.min.js"), "utf8"), jszip: fs.readFileSync(require.resolve("jszip/dist/jszip.min.js"), "utf8"), jspdf: fs.readFileSync(path.join(__dirname, "../../node_modules/jspdf/dist/jspdf.umd.min.js"), "utf8"), autotable: fs.readFileSync(path.join(__dirname, "../../node_modules/jspdf-autotable/dist/jspdf.plugin.autotable.min.js"), "utf8") };
 const BASE = "http://tracker.test/";
 let pass = 0, fail = 0; const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log("FAIL " + n + " " + JSON.stringify(x ?? "")); } };
 const iso = d => d.toISOString().slice(0, 10), DAY = 86400000, now = Date.now();
@@ -42,6 +42,8 @@ async function page(b, { vp = { width: 1280, height: 900 }, seedRows = seed, has
     if (/supabase-js.*supabase\.js/.test(u)) return r.fulfill({ contentType: "application/javascript", body: MOCK });
     if (/xlsx.*\.js$/.test(u)) return r.fulfill({ contentType: "application/javascript", body: LIBS.xlsx });
     if (/jszip.*\.js$/.test(u)) return r.fulfill({ contentType: "application/javascript", body: LIBS.jszip });
+    if (/autotable.*\.js$/.test(u)) return r.fulfill({ contentType: "application/javascript", body: LIBS.autotable });
+    if (/jspdf.*\.js$/.test(u)) return r.fulfill({ contentType: "application/javascript", body: LIBS.jspdf });
     if (/config\.js/.test(u)) return r.fulfill({ contentType: "application/javascript", body: 'window.TRACKER_CONFIG={supabaseUrl:"https://a.supabase.co",supabaseAnonKey:"k"};' });
     if (/functions\/v1\/transcript/.test(u)) return onFn ? onFn(r) : r.fulfill({ status: 404, body: "{}" });
     if (u.startsWith(BASE)) return r.fulfill({ contentType: "text/html", body: fs.readFileSync(WEB + "/index.html", "utf8") });
@@ -241,6 +243,10 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("export sheets", back.SheetNames.join(",") === "Current,To-dos,Old Projects,Reminders,Key developments,Calendar,11.02.26,10.27.26", back.SheetNames);
   const curBack = XLSX.utils.sheet_to_json(back.Sheets.Current, { header: 1, defval: "" });
   ok("export keeps the empty board category heading", curBack.some(r => r[0] === "Quarterly Board Updates"));
+  const [pdf] = await Promise.all([p.waitForEvent("download"), p.click('.headacts [data-act="export-pdf"]')]);
+  const pdfPath = path.join(OUT, pdf.suggestedFilename()); await pdf.saveAs(pdfPath);
+  ok("pdf export file name", /^Corp_Dev_Projects_\d{4}-\d{2}-\d{2}\.pdf$/.test(pdf.suggestedFilename()), pdf.suggestedFilename());
+  { const head = fs.readFileSync(pdfPath).slice(0, 5).toString("latin1"); ok("pdf is a real pdf file", head === "%PDF-", head); }
   // re-import the export: same projects are skipped
   await p.click("#whoDot"); await p.click('#whoMenu [data-act="import-wb"]'); await p.setInputFiles("#f_wbfile", fp); await p.waitForTimeout(400);
   ok("re-import skips projects already there", (await p.textContent("#wbForm")).includes("already in the tracker"));
@@ -311,7 +317,8 @@ const docs = (p, t) => p.evaluate(t => Object.values(window.__mock.store[t]).map
   ok("event calendar file is an all-day event", evIcs.includes("DTSTART;VALUE=DATE:" + dd(40).replace(/-/g, "")) && evIcs.includes("SUMMARY:Strategy day") && evIcs.includes("LOCATION:All offices"));
   await p.click('.drawer-h [data-act="close"]');
   await p.click('.fchip[data-act="etype"][data-v="Holiday"]');
-  ok("type filter", (await p.$$eval(".agenda li", x => x.length)) === 1);
+  { const ids = await p.$$eval(".agenda li", x => x.map(e => e.dataset.id));
+    ok("type filter shows holidays only", ids.includes(ne.id) && ids.every(id => ["Holiday"].includes((seed.find(r => r[1] === id) || [,, { type: "Holiday" }])[2].type) || id === ne.id)); }
   ok("no page errors (2)", !p.errs.length, p.errs);
   await p.screenshot({ path: path.join(OUT, "meeting.png") });
   await p.close();
