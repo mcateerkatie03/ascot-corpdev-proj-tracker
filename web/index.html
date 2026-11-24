@@ -525,7 +525,7 @@ function renderWeek(){
   return `
   <section class="pagehead"><div><h2 class="action-title">${lm?`Week of ${esc(fmtDate(lm.date))}`:"This week"}</h2>
     <p class="sub">${lm?`From the meeting on ${esc(fmtDate(lm.date))}${lm.summary?`: ${esc(lm.summary)}`:"."}`:"Import a meeting transcript to fill in this week's updates and to-dos."}</p></div>
-    <div class="headacts"><button class="btn accent" data-act="import-tr">Meeting &#8594; Copilot</button><button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn" data-act="export-pdf">Export PDF</button><button class="btn" data-act="print">Print</button><button class="btn" data-act="reminders">Reminders${openRem?` (${openRem})`:""}</button></div></section>
+    <div class="headacts"><button class="btn accent" data-act="import-tr">Meeting &#8594; Copilot</button><button class="btn primary" data-act="new-project">Add project</button><button class="btn" data-act="export-xlsx">Export Excel</button><button class="btn" data-act="export-pdf">Export PDF</button><button class="btn" data-act="print">Print</button><button class="btn" data-act="reminders">Reminders${openRem?` (${openRem})`:""}</button></div></section>
   <section class="tiles" aria-label="Headline numbers">
     <div class="tile"><b class="c-mag">${act.length}</b><span>Active projects</span><small>${open.length} on the list</small></div>
     <div class="tile"><b class="c-navy">${pend.length}</b><span>Pending</span><small>No update, or waiting on others</small></div>
